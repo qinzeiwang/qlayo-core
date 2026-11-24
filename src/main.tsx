@@ -686,16 +686,17 @@ function App() {
   const createRegion=(form:RegionForm)=>{
     setCreating(false);setDrawingIntent('create');setDrawingForm(form);
     if(baseImage&&!baseImage.metersPerPixel){setCalibration({mode:'rescale',base:baseImage});return;}
-    const carport=form.endsWith('carport');
+    const carport=form.endsWith('carport'),prefix=carport?tx('车棚'):tx('屋面');
+    let n=1;
+    while(hasSelection&&roofs.some(r=>r.name===`${prefix} ${n}`))n++;
+    const name=`${prefix} ${n}`;
+    const r=newRegionDefaults(initialRegionForm(carport?carportFromPrevious(active,name):roofFromPrevious(active,name),form));
     if(baseImage||coreEdition&&carport){
       if(!baseImage){const blank=blankDrawing();setBaseImage(blank);drawingView.current=blankDrawingInitialView(blank);}
-      const prefix=carport?tx('车棚'):tx('屋面');let n=1;while(roofs.some(r=>r.name===`${prefix} ${n}`))n++;
-      setDrawingDraft(newRegionDefaults(initialRegionForm(carport?carportFromPrevious(active,`${prefix} ${n}`):roofFromPrevious(active,`${prefix} ${n}`),form)));
+      setDrawingDraft(r);
       setPanel('roof');setCollapsed(false);setMode('top');setNavigationMode('select');setCanvasMenu(null);setDisplayOpen(false);setSunOpen(false);setOverlayOpen(false);setMeasureTool(null);
       setDrawingTool(carport?'carport':'roof');setImageOpen(true);return;
     }
-    const prefix=carport?tx('车棚'):tx('屋面');let n=1;while(roofs.some(r=>r.name===`${prefix} ${n}`))n++;
-    const r=newRegionDefaults(initialRegionForm(carport?carportFromPrevious(active,`${prefix} ${n}`):roofFromPrevious(active,`${prefix} ${n}`),form));
     const empty=!hasSelection&&roofs.length===1&&!active.arrays.length&&!active.obstacles.length;
     if(!empty){const b=projectBounds(roofs);r.x=b.x+b.width/2+r.roof.width/2+2;}else r.name=`${prefix} 1`;
     setRoofs(empty?[r]:[...roofs,r]);chooseRoof(r.id);setPanel('roof');setMode('top');setReset(n=>n+1);
