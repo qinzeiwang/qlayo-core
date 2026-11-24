@@ -2,7 +2,7 @@ import {newId} from './ids';
 import {useCallback,useEffect,useState} from 'react';
 import {defaultModule,validModule} from './domain';
 import {Icon} from './workbench-ui';
-import {isBuiltInModule,type ModuleCatalogItem} from './module-library';
+import {isBuiltInModule,projectDefaultModule,type ModuleCatalogItem} from './module-library';
 import {readModuleLibrary,sameLibraryModule,setModuleShared} from './saved-module-library';
 import './module-library-panel.css';
 import {tx} from './i18n';
@@ -63,13 +63,15 @@ export function ModuleLibraryPanel({items,usedIds,onChange}:Props){
   </section>
  </div>;
 }
-export function ModulePicker({items,value,standardOnly,disabled,onSelect}:{items:ModuleCatalogItem[];value?:string;standardOnly:boolean;disabled?:boolean;onSelect:(item:ModuleCatalogItem)=>void}){
+export function ModulePicker({items,value,inherited,standardOnly,disabled,onSelect}:{items:ModuleCatalogItem[];value?:string;inherited:boolean;standardOnly:boolean;disabled?:boolean;onSelect:(item:ModuleCatalogItem,inherit:boolean)=>void}){
  const available=items.filter(item=>!standardOnly||(item.spec.kind??'standard')==='standard');
  const selected=available.find(item=>item.id===value);
+ const fallback=projectDefaultModule(items,standardOnly),inheritValue='@project-default';
  return <section className="module-picker">
   <div className="element-heading"><h2>{tx('组件')}</h2></div>
   <label className="workbench-select-row"><span>{tx('组件型号')}</span>
-   <select disabled={disabled} aria-label={tx('当前区域组件')} value={selected?.id??''} onChange={e=>{const item=available.find(x=>x.id===e.target.value);if(item)onSelect(item);}}>
+   <select disabled={disabled} aria-label={tx('当前区域组件')} value={inherited&&fallback?inheritValue:selected?.id??''} onChange={e=>{const inherit=e.target.value===inheritValue;const item=inherit?fallback:available.find(x=>x.id===e.target.value);if(item)onSelect(item,inherit);}}>
+    {fallback&&<option value={inheritValue}>{tx('跟随项目默认 · {0}',fallback.name)}</option>}
     {!selected&&<option value="" disabled>{tx('请选择组件')}</option>}
     {available.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
    </select>

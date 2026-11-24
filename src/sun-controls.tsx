@@ -1,6 +1,6 @@
 import './location-presets.css';
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {daylightMinutes,sunPosition,validSunSettings,type SunSettings} from './sun-position';
+import {daylightMinutes,nearestDaylight,timeLabel,sunPosition,validSunSettings,type SunSettings} from './sun-position';
 import {cityPresets,locationResolved,locationMismatch,winterShadowFactor} from './location-presets';
 import {Icon} from './workbench-ui';
 import {IconPlayerPauseFilled,IconPlayerPlayFilled} from '@tabler/icons-react';
@@ -42,15 +42,6 @@ export function SunLocation({value,onChange,address='',onDraftChange}:Props&{add
   <details ref={cityReference} className="settings-secondary"><summary>{tx('城市坐标参考')}</summary><div className="city-reference"><table><thead><tr><th>{tx('城市')}</th><th>{tx('经度 / 纬度')}</th><th>{tx('投影 m')}</th><th>{tx('采用')}</th></tr></thead><tbody>{cityPresets.map(c=><tr key={c.name}><td>{c.name}</td><td>{c.longitude.toFixed(2)} / {c.latitude.toFixed(2)}</td><td title={tx('1 米高差、正南朝向，冬至真太阳时 9–15 时的南北阴影投影；不是完整影长。')}>{winterShadowFactor(c.latitude).toFixed(2)}</td><td><button type="button" aria-label={tx('采用{0}坐标',c.name)} onClick={()=>applyCity(c)}>{tx('采用')}</button></td></tr>)}</tbody></table></div><p className="settings-note">{tx('坐标来源：GeoNames，城市参考点，CC BY 4.0。')}</p></details>
  </div>;
 }
-function timeLabel(minute:number){
- return `${String(Math.floor(minute/60)).padStart(2,'0')}:${String(minute%60).padStart(2,'0')}`;
-}
-
-function nearestDaylight(minutes:number[],time:string){
- const [hour,minute]=time.split(':').map(Number),target=hour*60+minute;
- return minutes.reduce((best,m,i)=>Math.abs(m-target)<Math.abs(minutes[best]-target)?i:best,0);
-}
-
 export function SunDateTime({value,onChange,previewTime,onPreview}:Props&{
  previewTime:string|null;onPreview:(time:string|null)=>void;
 }){

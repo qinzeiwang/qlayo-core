@@ -433,7 +433,7 @@ function Scene(input: ViewProps) {
             captureCamera=camera;
           }
         }else if(liveCamera instanceof THREE.PerspectiveCamera){
-          const fitted={...view.current};
+          const fitted={...(latest.current.visual?.stress?stressView.current:orbitView.current)};
           fitOrbitView(fitted,aspect,liveCamera.fov,exportSites,exportObstacles,exportArrays);
           const camera=liveCamera.clone(),position=orbitPosition(fitted);
           camera.far=Math.max(camera.far,fitted.distance*3);
@@ -487,7 +487,9 @@ function Scene(input: ViewProps) {
     [],
   );
   const active = props.mode === "top" ? cameras.top : cameras.perspective;
-  const view = useRef(viewStart(1.7));
+  const topView=useRef(viewStart(1.7)),orbitView=useRef(viewStart(1.7)),stressView=useRef(viewStart(1.7));
+  const orbitInitialized=useRef(false);
+  const view=props.mode==='top'?topView:stress?stressView:orbitView;
   const lastFitSignal=useRef(props.fitSignal);
   const [planView,setPlanView]=useState<PlanView>(()=>({...view.current}));
   const [pdfView,setPdfView]=useState<PdfViewport>({x:0,y:0,width:1,height:1});
@@ -538,36 +540,40 @@ function Scene(input: ViewProps) {
     fit();
   }, [active, size.width, size.height]);
   const framePlan=(aspect:number)=>{
-    Object.assign(view.current,fittedPlanView(props.focus,roof,aspect));
+    const plan=topView.current;
+    Object.assign(plan,fittedPlanView(props.focus,roof,aspect));
     const base=props.baseImage;
     if(base?.metersPerPixel&&!props.sites?.length&&!base.blank){
       const k=base.metersPerPixel,f=base.frame??{x:0,y:0,width:base.width,height:base.height};
       const left=Math.min((-f.x-f.width/2)*k,(props.focus?.x??0)-roof.width/2),right=Math.max((base.width-f.x-f.width/2)*k,(props.focus?.x??0)+roof.width/2);
       const top=Math.min((-f.y-f.height/2)*k,(props.focus?.z??0)-roof.depth/2),bottom=Math.max((base.height-f.y-f.height/2)*k,(props.focus?.z??0)+roof.depth/2);
-      view.current.x=(left+right)/2;view.current.z=(top+bottom)/2;
-      view.current.span=Math.max((bottom-top)*1.06,(right-left)*1.06/aspect,10);
+      plan.x=(left+right)/2;plan.z=(top+bottom)/2;
+      plan.span=Math.max((bottom-top)*1.06,(right-left)*1.06/aspect,10);
     }
   };
   useLayoutEffect(() => {
     const {width,height}=get().size;
     const aspect=Math.max(1,width)/Math.max(1,height);
-    view.current = viewStart(aspect);
-    if (stress) {
-      view.current.distance = Math.max(210,stressCount/1000*38+20)*1.7;
-      view.current.pitch = 0.88;
-    } else if (props.mode === "3d") {
-      view.current.distance = 42;
-      view.current.pitch = 0.7;
-      view.current.yaw = 0.48;
-    }
-    if (!stress) {
-      if(props.mode==='top')framePlan(aspect);
-      else Object.assign(view.current,fittedPlanView(props.focus,roof,aspect));
-      view.current.distance = Math.max(roof.width, roof.depth) * 1.7;
-    }
-    if (props.mode === '3d' && props.eyeLevel && !stress) eyeLevel(view.current, true);
+    topView.current=viewStart(aspect);
+    framePlan(aspect);
+    orbitInitialized.current=false;
+    if(props.mode==='top')fit();
+  }, [props.reset]);
+  useLayoutEffect(()=>{
+    if(props.mode!=='3d'||stress||orbitInitialized.current)return;
+    const {width,height}=get().size;
+    const aspect=Math.max(1,width)/Math.max(1,height);
+    orbitView.current={...viewStart(aspect),...fittedPlanView(props.focus,roof,aspect),
+      distance:Math.max(roof.width,roof.depth)*1.7,pitch:.7,yaw:.48};
+    if(props.eyeLevel)eyeLevel(orbitView.current,true);
+    orbitInitialized.current=true;
     fit();
-  }, [props.reset, props.mode, stress,stressCount]);
+  },[props.mode,props.reset,stress]);
+  useLayoutEffect(()=>{
+    if(!stress)return;
+    stressView.current={...viewStart(1.7),distance:Math.max(210,stressCount/1000*38+20)*1.7,pitch:.88};
+    fit();
+  },[stress,stressCount]);
   useLayoutEffect(()=>{
     if(lastFitSignal.current===props.fitSignal)return;
     lastFitSignal.current=props.fitSignal;
@@ -579,19 +585,19 @@ function Scene(input: ViewProps) {
     fit();
   },[props.fitSignal]);
   useLayoutEffect(()=>{
-    if(props.mode!=='3d'||stress)return;
-    eyeLevel(view.current,!!props.eyeLevel);
-    fit();
+    eyeLevel(orbitView.current,!!props.eyeLevel);
+    if(props.mode==='3d'&&!stress)fit();
   },[props.eyeLevel]);
   useLayoutEffect(()=>{
     const r=props.restoreDrawingView,b=props.baseImage;
-    if(!r||!b?.frame||!b.metersPerPixel||props.mode!=='top')return;
+    if(!r||!b?.frame||!b.metersPerPixel)return;
     const k=b.metersPerPixel,h=Math.max(1,get().size.height);
-    view.current.span=r.height*k*h/(r.viewportHeight??h);
-    view.current.x=(r.x+r.width/2-b.frame.x-b.frame.width/2)*k;
-    view.current.z=(r.y+r.height/2-b.frame.y-b.frame.height/2)*k;
-    fit();
-  },[props.restoreDrawingView,props.mode]);
+    const plan=topView.current;
+    plan.span=r.height*k*h/(r.viewportHeight??h);
+    plan.x=(r.x+r.width/2-b.frame.x-b.frame.width/2)*k;
+    plan.z=(r.y+r.height/2-b.frame.y-b.frame.height/2)*k;
+    if(props.mode==='top')fit();
+  },[props.restoreDrawingView]);
   useLayoutEffect(()=>{
     if(!props.viewCommand?.id)return;
     zoomView(view.current,props.viewCommand.factor);

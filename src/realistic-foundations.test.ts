@@ -5,10 +5,12 @@ import {geometry,initial,type PVArray} from './domain';
 const array=(rows:number,columns=6):PVArray=>({...initial,id:'test',name:'test',rows,columns,connectedRows:true});
 const position=(m:any)=>new Vector3().setFromMatrixPosition(m);
 describe('flat roof foundations',()=>{
- for(const rows of [1,2,3])it(`${rows} connected module rows use ${Math.max(2,rows)} foundation rows`,()=>{
+ for(const [rows,foundationRows] of [[1,2],[2,3],[3,3],[4,4]])it(`${rows} connected module rows use ${foundationRows} foundation rows`,()=>{
   const data=instanceData([array(rows)]);
   const points=data.pads.map(p=>position(p.matrix));
-  expect(new Set(points.map(p=>p.z)).size).toBe(Math.max(2,rows));
+  expect(new Set(points.map(p=>p.z)).size).toBe(foundationRows);
+  expect(data.channels).toHaveLength(data.pads.length);
+  if(rows===2)expect(points.some(point=>Math.abs(point.z)<1e-9)).toBe(true);
   const xs=[...new Set(points.map(p=>p.x))].sort((a,b)=>a-b);
   expect(xs.length).toBeGreaterThanOrEqual(2);
   for(let i=1;i<xs.length;i++)expect(xs[i]-xs[i-1]).toBeLessThanOrEqual(2+1e-9);

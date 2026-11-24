@@ -13,7 +13,8 @@ export function flatFoundationGrid(width:number,depth:number,rows:number,edge=FL
  const span=bayUnits?bayUnits/100:clear;
  const xs=Array.from({length:count+1},(_,i)=>Math.round(i*bayUnits/count)/100-span/2);
  if(!bayUnits)xs[1]=span/2;
- const posts=Math.max(2,rows),run=centreSpan(depth);
+ // A two-module slope adds a middle support between the two outer rows.
+ const posts=rows===1?2:Math.max(3,rows),run=centreSpan(depth);
  const zs=Array.from({length:posts},(_,i)=>-run/2+i*run/(posts-1));
  return {xs,zs};
 }

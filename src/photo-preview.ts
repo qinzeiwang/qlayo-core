@@ -15,7 +15,7 @@ import {corners,type PVArray} from './domain';
 import {projectBounds,roofRect,sceneData,worldObstacle,type RoofDesign} from './roof-project';
 import {tx} from './i18n';
 /** What a photo render puts in the scene: hidden photo surfaces (they only hide panels and catch shadows), panels, and carport steel. */
-type Stage={surface:(geometry:T.BufferGeometry,position?:T.Vector3,yaw?:number)=>void;arrays:(arrays:PVArray[])=>void;carport:(arrays:PVArray[])=>void};
+type Stage={surface:(geometry:T.BufferGeometry,position?:T.Vector3,yaw?:number,receiveShadow?:boolean)=>void;arrays:(arrays:PVArray[])=>void;carport:(arrays:PVArray[])=>void};
 type Setup={camera:T.PerspectiveCamera;sun:T.Vector3;daylight:boolean;elevation:number;center:T.Vector3;span:number;rmse:number;build:(stage:Stage)=>void};
 // Pinhole projection in WebGL convention with an off-centre principal point (docs/PHOTO-CAMERA-MATCHING.md §11).
 function projection(camera:T.PerspectiveCamera,f:number,cx:number,cy:number,W:number,H:number,near:number,far:number){
@@ -47,11 +47,11 @@ function roofSetup(m:PhotoView,r:RoofDesign,options:PhotoRenderOptions,northAngl
   stage.arrays(photoRoofArrays(r));
  }};
 }
-// A vertical prism over a plan polygon (world x, z), from `bottom` to `top`.
-function prism(points:{x:number;z:number}[],bottom:number,top:number){
+// A horizontal receiver at `top`, or vertical occluders from `bottom` to `top`.
+function footprintSurface(points:{x:number;z:number}[],top:number,bottom?:number){
  const position:number[]=[];
- for(const tri of T.ShapeUtils.triangulateShape(points.map(p=>new T.Vector2(p.x,p.z)),[]))for(const i of tri)position.push(points[i].x,top,points[i].z);
- points.forEach((p,i)=>{const q=points[(i+1)%points.length];position.push(p.x,bottom,p.z,q.x,bottom,q.z,q.x,top,q.z,p.x,bottom,p.z,q.x,top,q.z,p.x,top,p.z);});
+ if(bottom===undefined)for(const tri of T.ShapeUtils.triangulateShape(points.map(p=>new T.Vector2(p.x,p.z)),[]))for(const i of tri)position.push(points[i].x,top,points[i].z);
+ if(bottom!==undefined)points.forEach((p,i)=>{const q=points[(i+1)%points.length];position.push(p.x,bottom,p.z,q.x,bottom,q.z,q.x,top,q.z,p.x,bottom,p.z,q.x,top,q.z,p.x,top,p.z);});
  const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.Float32BufferAttribute(position,3));geometry.computeVertexNormals();return geometry;
 }
 /** Point and line views: one camera for the whole site in world coordinates, so every roof and carport appears where the plan puts it. */
@@ -62,12 +62,26 @@ function siteSetup(m:PhotoView,roofs:RoofDesign[],options:PhotoRenderOptions,nor
  const camera=threeCamera(solved,m.width,m.height,.3,Math.hypot(solved.C[0]-center.x,solved.C[1]-center.y,solved.C[2]-center.z)+ground);
  const sunVector=sunPosition(options.sun,northAngle);
  return {camera,sun:new T.Vector3(sunVector.x,sunVector.y,sunVector.z),daylight:sunVector.daylight,elevation:sunVector.elevation,center,span,rmse:solved.rmse,build:stage=>{
-  // The ground only receives shadows; casting onto itself would stripe it (shadow acne).
-  const plane=new T.PlaneGeometry(ground,ground);plane.rotateX(-Math.PI/2);stage.surface(plane,center.clone());
+  const carportsOnly=roofs.every(r=>r.carport);
+  if(carportsOnly){
+   const plane=new T.PlaneGeometry(ground,ground);
+   plane.rotateX(-Math.PI/2);
+   stage.surface(plane,center.clone());
+  }
   for(const r of roofs){
-   if(!r.carport){
-    const top=r.pitch?r.pitch.eave-3.5:(r.flatHeight??3.5)-3.5;stage.surface(prism(corners(roofRect(r)),GROUND,top));
-    if(r.pitch){const roof=new T.BufferGeometry();roof.setAttribute('position',new T.BufferAttribute(photoRoofVertices(r.roof.width,r.roof.depth,r.pitch),3));roof.computeVertexNormals();stage.surface(roof,new T.Vector3(r.x,top,r.z),r.yaw);}
+   const outline=corners(roofRect(r));
+   if(r.carport){
+    if(!carportsOnly&&r.arrays.length)stage.surface(footprintSurface(outline,GROUND));
+   }else{
+    const top=r.pitch?r.pitch.eave-3.5:(r.flatHeight??3.5)-3.5;
+    // Keep the walls for depth occlusion. The actual roof is the receiver.
+    stage.surface(footprintSurface(outline,top,GROUND),undefined,0,false);
+    if(r.pitch){
+     const roof=new T.BufferGeometry();
+     roof.setAttribute('position',new T.BufferAttribute(photoRoofVertices(r.roof.width,r.roof.depth,r.pitch),3));
+     roof.computeVertexNormals();
+     stage.surface(roof,new T.Vector3(r.x,top,r.z),r.yaw);
+    }else stage.surface(footprintSurface(outline,top));
    }
    for(const o of r.obstacles){if(o.kind==='keepout')continue;const w=worldObstacle(o,r),base=w.baseHeight??GROUND;stage.surface(new T.BoxGeometry(w.width,w.height,w.depth),new T.Vector3(w.x,base+w.height/2,w.z),w.yaw);}
   }
@@ -86,10 +100,10 @@ async function renderOverPhoto(m:PhotoView,options:PhotoRenderOptions,setup:Setu
  scene.add(new T.HemisphereLight(0xf2f2ef,0xaaa9a5,overcast?2.5:1.15));const sun=new T.DirectionalLight(0xfff0db,overcast||!setup.daylight?0:2.6);sun.position.copy(center).addScaledVector(direction,span*2);sun.target.position.copy(center);scene.add(sun.target);sun.castShadow=true;Object.assign(sun.shadow.camera,{left:-span,right:span,top:span,bottom:-span,near:.1,far:span*5});sun.shadow.mapSize.set(fine?4096:2048,fine?4096:2048);sun.shadow.normalBias=.008;scene.add(sun);
  const sky=new Sky();sky.material.uniforms.sunPosition.value.copy(direction);sky.material.uniforms.turbidity.value=5;sky.scale.setScalar(1000);const env=new T.Scene();if(overcast)env.background=new T.Color(0xc8cdd2);else env.add(sky);const pmrem=new T.PMREMGenerator(renderer);environment=pmrem.fromScene(env);scene.environment=environment.texture;scene.environmentIntensity=overcast?1.1:.35;pmrem.dispose();sky.geometry.dispose();sky.material.dispose();
  // Existing geometry occludes the overlay and receives module shadows. Its own shadows are already in the photo.
- function surface(geometry:T.BufferGeometry,position=new T.Vector3(),yaw=0){
+ function surface(geometry:T.BufferGeometry,position=new T.Vector3(),yaw=0,receiveShadow=true){
   const depth=new T.Mesh(geometry,new T.MeshBasicMaterial({colorWrite:false,side:T.DoubleSide}));
   depth.position.copy(position);depth.rotation.y=yaw;depth.renderOrder=-1;scene.add(depth);
-  if(!simple&&!overcast){
+  if(receiveShadow&&!simple&&!overcast){
    const receiver=new T.Mesh(geometry.clone(),new T.ShadowMaterial({color:0x202020,opacity:options.shadowStrength??defaultPhotoShadowStrength,depthWrite:false,side:T.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1}));
    receiver.position.copy(position);receiver.rotation.y=yaw;receiver.receiveShadow=true;scene.add(receiver);
   }
@@ -117,7 +131,7 @@ async function renderOverPhoto(m:PhotoView,options:PhotoRenderOptions,setup:Setu
   add(data.purlins,steel(),{profile:channelGeometry(.041)});
   add(data.rafters,steel(),{profile:channelGeometry(.052)});
   add(data.channels,steel(),{profile:channelGeometry(.052)});
-  add(data.pads,new T.MeshStandardMaterial({color:0xaaa9a3,roughness:.95}));
+  add(data.pads,new T.MeshStandardMaterial({color:0x716f69,roughness:.97,envMapIntensity:.15}));
  }
  setup.build({surface,arrays,carport:list=>carportMeshes(list).forEach(mesh=>{mesh.castShadow=false;scene.add(mesh);})});
  renderer.render(scene,camera);const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d')!;ctx.imageSmoothingQuality='high';ctx.drawImage(photo,0,0,W,H);ctx.drawImage(renderer.domElement,0,0);for(const polygon of m.occlusions??[]){ctx.save();ctx.beginPath();polygon.forEach((p,i)=>{const x=p.x*W/m.width,y=p.y*H/m.height;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);});ctx.closePath();ctx.clip();ctx.drawImage(photo,0,0,W,H);ctx.restore();}drawPictureMark(ctx,W,H);const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error(tx('图片导出失败'))),'image/png'));sun.shadow.dispose();return {url:URL.createObjectURL(blob),rmse:setup.rmse,width:W,height:H,settingsKey:JSON.stringify(options),sunElevation:setup.elevation};

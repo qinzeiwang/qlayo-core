@@ -38,6 +38,15 @@ export function daylightMinutes(day:SunDay):number[]{
  return minutes;
 }
 
+export function timeLabel(minute:number){
+ return `${String(Math.floor(minute/60)).padStart(2,'0')}:${String(minute%60).padStart(2,'0')}`;
+}
+
+export function nearestDaylight(minutes:number[],time:string){
+ const [hour,minute]=time.split(':').map(Number),target=hour*60+minute;
+ return minutes.reduce((best,m,i)=>Math.abs(m-target)<Math.abs(minutes[best]-target)?i:best,0);
+}
+
 function sunAtMinute(s:SunDay,midnight:number,minute:number,northAngle:number){
  const instant=midnight+(minute-s.utcOffset*60)*60000;
  const t=(instant/86400000+2440587.5-2451545)/36525,rad=Math.PI/180;

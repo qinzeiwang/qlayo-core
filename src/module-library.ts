@@ -5,6 +5,10 @@ import {en} from './i18n-en';
 
 export type ModuleCatalogItem={id:string;name:string;spec:ModuleSpec};
 export const standardModuleId='module-standard-default';
+export function projectDefaultModule(items:ModuleCatalogItem[],standardOnly:boolean){
+ return items.find(item=>!standardOnly||item.spec.kind!=='lightweight');
+}
+
 export const lightweightModuleId='module-lightweight-default';
 
 export function defaultModuleCatalog():ModuleCatalogItem[]{

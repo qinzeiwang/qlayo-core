@@ -179,6 +179,7 @@
 .photo-appearance-slider input::-webkit-slider-thumb{
  appearance:none;width:12px;height:12px;border:0;border-radius:50%;background:var(--pv-text);margin-top:-4.5px;
 }
+.photo-time-edges{grid-column:1/-1;display:flex;justify-content:space-between;font-variant-numeric:tabular-nums}
 .photo-appearance-slider input:disabled{opacity:.45;cursor:default}
 .photo-workspace .photo-render-settings .photo-save:disabled{color:var(--pv-text-secondary);background:var(--pv-surface-slot)}
 .photo-export-size{text-align:right;font-variant-numeric:tabular-nums}

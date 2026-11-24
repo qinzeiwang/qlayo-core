@@ -12,7 +12,7 @@ export type RoofDesign = {
   carport?:CarportOptions;
   pitch?:RoofPitch; flatHeight?:number;
   id:string; name:string; x:number; z:number; yaw:number;
-  roof:import("./polygon").Footprint; moduleId?:string; moduleSpec:ModuleSpec; layoutOptions:LayoutOptions;
+  roof:import("./polygon").Footprint; moduleId?:string; useProjectDefaultModule?:boolean; moduleSpec:ModuleSpec; layoutOptions:LayoutOptions;
   wallHeight:number; obstacles:Obstacle[]; arrays:PVArray[];
   layoutSignature:string; layoutMessage:string; previous:PVArray[]|null;
 };

@@ -70,7 +70,7 @@ import "./brand.css";
 import "./theme/install";
 import {ModulePicker} from './module-library-panel';
 import {NewProjectDialog,CanvasObjectMenu} from './workspace-dialogs';
-import {defaultModuleCatalog,sameModule,type ModuleCatalogItem} from './module-library';
+import {defaultModuleCatalog,projectDefaultModule,sameModule,type ModuleCatalogItem} from './module-library';
 import {readModuleLibrary} from './saved-module-library';
 import { ImageEditor } from './image-editor';
 import {CalibrationWorkspace} from './calibration-workspace';
@@ -245,12 +245,21 @@ function App() {
   useEffect(()=>{inspector.current?.scrollTo({top:0});},[active.id,selectedObstacleId,selectedId,panel]);
   const capacity = arrays.reduce((sum,a)=>sum+a.rows*a.columns*(a.module??defaultModule).power/1000,0);
   const total=totals(roofs);
+  const usesProjectModule=(r:RoofDesign)=>r.useProjectDefaultModule??(r.moduleId===projectDefaultModule(moduleCatalog,!!r.carport)?.id);
+  const applyRegionModule=(r:RoofDesign,item:ModuleCatalogItem,inherit:boolean)=>({
+    ...r,moduleId:item.id,moduleSpec:{...item.spec},useProjectDefaultModule:inherit,
+    layoutOptions:item.spec.kind==='lightweight'&&r.layoutOptions.layoutAreaEnabled?{...r.layoutOptions,layoutAreaEnabled:false}:r.layoutOptions,
+  });
   const updateModuleCatalog=(next:ModuleCatalogItem[])=>{
     if(!next.length||next.length>50||next.some(item=>!item.name.trim()||!validModule(item.spec)))return tx('组件名称和规格无效，未应用修改');
     if(roofs.some(r=>r.carport&&next.find(item=>item.id===r.moduleId)?.spec.kind==='lightweight'))return tx('车棚正在使用该组件，不能改为轻质组件');
     if(roofs.some(r=>r.moduleId&&!next.some(item=>item.id===r.moduleId)))return tx('组件正在被区域使用，不能删除');
     setModuleCatalog(next);
-    setRoofs(current=>current.map(r=>{const item=next.find(candidate=>candidate.id===r.moduleId);return item?{...r,moduleSpec:{...item.spec}}:r;}));
+    setRoofs(current=>current.map(r=>{
+      const inherit=usesProjectModule(r);
+      const item=inherit?projectDefaultModule(next,!!r.carport):next.find(candidate=>candidate.id===r.moduleId);
+      return item?applyRegionModule(r,item,inherit):r;
+    }));
     return null;
   };
   const bindModule=(r:RoofDesign):RoofDesign=>{
@@ -261,8 +270,8 @@ function App() {
   };
   const defaults=projectDocument.layoutDefaults??initialLayoutDefaults;
   function newRegionDefaults(r:RoofDesign):RoofDesign{
-    const item=moduleCatalog.find(i=>!r.carport||i.spec.kind!=='lightweight');
-    return bindModule({...r,moduleId:item?.id,moduleSpec:item?.spec??r.moduleSpec,layoutOptions:{
+    const item=projectDefaultModule(moduleCatalog,!!r.carport);
+    return bindModule({...r,useProjectDefaultModule:true,moduleId:item?.id,moduleSpec:item?.spec??r.moduleSpec,layoutOptions:{
       portrait:true,...defaults,tableRows:r.pitch?Math.min(defaults.tableRows,6):defaults.tableRows,
       edge:globalEdge,spacingMode:'solar',rowGap:0,direction:0,azimuth:r.pitch||r.carport?undefined:180
     }});
@@ -786,7 +795,7 @@ function App() {
 
 
           <div className="layout-inspector" hidden={panel !== 'layout'||!hasSelection||!activeSelected}>
-          <ModulePicker items={moduleCatalog} value={active.moduleId} standardOnly={!!active.carport} disabled={running||stress} onSelect={item=>setRoofs(rs=>rs.map(r=>r.id===active.id?{...r,moduleId:item.id,moduleSpec:{...item.spec},layoutOptions:item.spec.kind==='lightweight'?{...r.layoutOptions,layoutAreaEnabled:false}:r.layoutOptions}:r))}/>
+          <ModulePicker items={moduleCatalog} value={active.moduleId} inherited={usesProjectModule(active)} standardOnly={!!active.carport} disabled={running||stress} onSelect={(item,inherit)=>setRoofs(rs=>rs.map(r=>r.id===active.id?applyRegionModule(r,item,inherit):r))}/>
 
 
 

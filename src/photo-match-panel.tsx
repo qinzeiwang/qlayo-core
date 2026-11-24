@@ -17,7 +17,7 @@ import {LineTools,PhotoInset,PhotoLineOverlay,PlanOverlay,isLineTool,planBox,sna
 import type {ImageOverlay} from './image-overlays';
 import {PhotoGuide} from './photo-guide';
 import './photo-match.css';
-import {defaultSunSettings,sunPosition,validSunSettings,type SunSettings} from './sun-position';
+import {daylightMinutes,defaultSunSettings,nearestDaylight,sunPosition,timeLabel,validSunSettings,type SunSettings} from './sun-position';
 import {renderPhotoPreview} from './photo-preview';
 import {coreEdition,tx} from './i18n';
 type Props={onSave:(items:PhotoView[],sites:SitePoint[])=>Promise<boolean>;sunSettings?:SunSettings;roofs:RoofDesign[];
@@ -41,8 +41,7 @@ function spreadVertices<T extends {x:number;z:number}>(vertices:T[]){
  return picked.sort((a,b)=>a-b).map(i=>vertices[i]);
 }
 export function PhotoMatchPanel({roofs,site,initialId,base,overlays,items,sitePoints,onApply,onClose,sunSettings,onSave}:Props){
- // Open on the chosen roof when it has photos, otherwise on the first roof that has some, so saved photos are never hidden.
- const [all,setAll]=useState(()=>structuredClone(items)),[id,setId]=useState(()=>[initialId,...roofs.map(r=>r.id)].find(i=>roofs.some(r=>r.id===i)&&items.some(v=>v.roofId===i))??(roofs.some(r=>r.id===initialId)?initialId:roofs[0]?.id)),[viewId,setViewId]=useState(''),[tool,setTool]=useState<'corners'|'height'|'pan'|'mask'|LineTool|PointTool>('corners'),[sites,setSites]=useState(()=>structuredClone(sitePoints)),[active,setActive]=useState<string>(),[dragging,setDragging]=useState(false),[pending,setPending]=useState<PhotoPoint>(),[error,setError]=useState(''),[busy,setBusy]=useState(false),[zoom,setZoom]=useState(1),[offset,setOffset]=useState({x:0,y:0});
+ const [all,setAll]=useState(()=>structuredClone(items)),[id,setId]=useState(()=>roofs.some(r=>r.id===initialId)?initialId:roofs[0]?.id),[viewId,setViewId]=useState(''),[tool,setTool]=useState<'corners'|'height'|'pan'|'mask'|LineTool|PointTool>('corners'),[sites,setSites]=useState(()=>structuredClone(sitePoints)),[active,setActive]=useState<string>(),[dragging,setDragging]=useState(false),[pending,setPending]=useState<PhotoPoint>(),[error,setError]=useState(''),[busy,setBusy]=useState(false),[zoom,setZoom]=useState(1),[offset,setOffset]=useState({x:0,y:0});
  const [referenceMode,setReferenceMode]=useState<'corners'|'custom'>('corners');
  const [markingView,setMarkingView]=useState<string>();
  const [confirmed,setConfirmed]=useState<string>();
@@ -79,7 +78,6 @@ export function PhotoMatchPanel({roofs,site,initialId,base,overlays,items,sitePo
  const legacyPolygon=!!r.roof.outline&&!!view&&!lines&&!points;
  const pointKey=view?JSON.stringify([view.id,view.marks,sites]):'';
  const marking=!!view&&markingView===view.id;
- const ready=!!view&&confirmed===pointKey&&!!solve?.camera;
  const markIds=view?.marks.flatMap(mark=>mark.anchor.kind==='site'?[mark.anchor.pointId]:[])??[];
  const selectedIds=referenceMode==='corners'&&!r.carport?defaultPointIds:(view?.referencePointIds??markIds);
  const visibleSites=coreEdition?selectedIds.flatMap(id=>sites.filter(point=>point.id===id)):sites;
@@ -98,6 +96,7 @@ export function PhotoMatchPanel({roofs,site,initialId,base,overlays,items,sitePo
  }:savedOptions;
  const wholeSite=coreEdition&&renderWholeSite&&site.length>1;
  const renderRoofs=coreEdition&&!wholeSite?[r]:site;
+ const hasRenderArrays=renderRoofs.some(roof=>roof.arrays.length>0);
  const settingsKey=JSON.stringify([options,wholeSite]);
  const checkpoint=()=>setUndo(v=>[...v.slice(-29),{views:structuredClone(all),sites:structuredClone(sites)}]);
  const update=(patch:Partial<PhotoEdit>)=>setAll(v=>v.map(x=>x.id===view?.id?applyEdit(x,{...editOf(x),...patch}):x));
@@ -232,8 +231,17 @@ export function PhotoMatchPanel({roofs,site,initialId,base,overlays,items,sitePo
  const activeNumber=visibleSites.findIndex(s=>s.id===active)+1;
  const status=points&&planMode?tx('点选屋角、车棚组件角或立柱（会吸附）；可拖动已选的点'):points&&tool==='pointPhoto'?(activeNumber?tx('在照片中点出点 {0}；可拖动已点的点调整',activeNumber):tx('全部点已完成，可拖动调整')):planMode?tx('在平面图上点出参考线的两端，可拖动调整'):lines&&isLineTool(tool)?(pending?tx('再点一下完成这条线'):solve?.camera?tx('相机已确定：线框为平面图中的屋面和车棚，应与照片对齐'):tx('按左侧提示画线，可拖动端点调整')):drawingMask?tx('沿遮挡物轮廓逐点圈选，至少三点后点击完成'):tool==='mask'?tx('选择遮挡区域，拖动角点调整'):!m?tx('导入现场照片'):tool==='pan'?tx('拖动平移，滚轮缩放'):tool==='corners'?(m.corners.length<4?tx('点选照片中的角 {0}',m.corners.length+1):tx('四角已标注，可拖动圆点调整')):m.heightMode==='below'?tx('点选角 {0} 正下方的墙脚',m.anchor+1):(m.heightPoints.length===0?tx('点选设备在屋面上的底点'):m.heightPoints.length===1?tx('点选设备顶部对应点'):tx('高度线已标注，可拖动端点调整'));
  const next=points&&view?nextPoint(view,visibleSites):undefined;
+ const savedMarks=view&&opened.current.all.find(item=>item.id===view.id)?.marks;
+ const savedReady=!!view&&view.roofSignature===photoRoofSignature(r)&&visibleSites.length>=4&&!next
+  &&savedMarks!==undefined&&JSON.stringify(savedMarks)===JSON.stringify(view.marks)
+  &&visibleSites.every(point=>opened.current.sites.some(saved=>saved.id===point.id&&saved.x===point.x&&saved.z===point.z&&saved.h===point.h));
+ const ready=!!view&&!marking&&!!solve?.camera&&(confirmed===pointKey||savedReady);
  const changeOptions=(patch:Partial<PhotoRenderOptions>)=>updateView({renderOptions:{...options,...patch}});
- const sun=options.sun,validSun=validSunSettings(sun),solar=validSun?sunPosition(sun):null,dirty=preview?.settingsKey!==settingsKey;
+ const sun=options.sun;
+ const {date,latitude,longitude,utcOffset}=sun;
+ const daylight=useMemo(()=>daylightMinutes({date,latitude,longitude,utcOffset}),[date,latitude,longitude,utcOffset]);
+ const daylightIndex=nearestDaylight(daylight,sun.time),lastDaylight=daylight.length-1;
+ const validSun=validSunSettings(sun),solar=validSun?sunPosition(sun):null,dirty=preview?.settingsKey!==settingsKey;
  const renderScope=coreEdition&&site.length>1&&<section className="photo-render-group">
   <h3>{tx('渲染范围')}</h3>
   <div className="photo-pair-actions seg-track" role="group" aria-label={tx('渲染范围')}>
@@ -263,7 +271,13 @@ export function PhotoMatchPanel({roofs,site,initialId,base,overlays,items,sitePo
   <section className="photo-render-group">
    <h3>{tx('光照与阴影')}</h3>
    {adjustment(tx('阴影强度'),options.shadowStrength??defaultPhotoShadowStrength,0,100,1,v=>changeOptions({shadowStrength:v}),!shadowAvailable)}
-  <label>{tx('天气')}<select value={options.weather} onChange={e=>changeOptions({weather:e.target.value as PhotoRenderOptions['weather']})}><option value="sunny">{tx('晴天')}</option><option value="overcast">{tx('阴天')}</option></select></label><label>{tx('日期')}<input data-1p-ignore type="date" value={sun.date} onInput={e=>changeOptions({sun:{...sun,date:e.currentTarget.value}})}/></label><label>{tx('时间')}<input data-1p-ignore type="time" value={sun.time} onChange={e=>{if(e.target.value)changeOptions({sun:{...sun,time:e.target.value}});}}/></label>{!coreEdition&&<details className="photo-render-location"><summary>{tx('光照地点')}</summary><label>{tx('纬度 °')}<input data-1p-ignore type="number" min="-90" max="90" step=".01" value={sun.latitude} onChange={e=>changeOptions({sun:{...sun,latitude:Number(e.target.value)}})}/></label><label>{tx('经度 °')}<input data-1p-ignore type="number" min="-180" max="180" step=".01" value={sun.longitude} onChange={e=>changeOptions({sun:{...sun,longitude:Number(e.target.value)}})}/></label><label>{tx('时区 UTC')}<input data-1p-ignore type="number" min="-12" max="14" step=".5" value={sun.utcOffset} onChange={e=>changeOptions({sun:{...sun,utcOffset:Number(e.target.value)}})}/></label></details>}<small>{solar?tx('太阳方位 {0}° · 高度 {1}°',solar.azimuth.toFixed(1),solar.elevation.toFixed(1)):tx('请填写有效地点和时间')}</small>{solar&&!solar.daylight&&<small>{tx('太阳在地平线以下，不产生直射光与日照阴影。')}</small>}</section>
+  <label>{tx('天气')}<select value={options.weather} onChange={e=>changeOptions({weather:e.target.value as PhotoRenderOptions['weather']})}><option value="sunny">{tx('晴天')}</option><option value="overcast">{tx('阴天')}</option></select></label><label>{tx('日期')}<input data-1p-ignore type="date" value={sun.date} onInput={e=>changeOptions({sun:{...sun,date:e.currentTarget.value}})}/></label>
+   <label className="photo-appearance-slider photo-time-slider"><span>{tx('当地时间')}</span><output>{sun.time}</output>
+    <input type="range" aria-label={tx('光照时间')} aria-valuetext={sun.time} min={0} max={Math.max(0,lastDaylight)} value={daylightIndex}
+     style={{'--photo-slider-progress':(lastDaylight>0?daylightIndex/lastDaylight*100:0)+"%"} as CSSProperties}
+     disabled={lastDaylight<=0} onChange={e=>changeOptions({sun:{...sun,time:timeLabel(daylight[e.target.valueAsNumber])}})}/>
+    {lastDaylight>=0&&<small className="photo-time-edges"><span>{timeLabel(daylight[0])}</span><span>{timeLabel(daylight[lastDaylight])}</span></small>}
+   </label>{!coreEdition&&<details className="photo-render-location"><summary>{tx('光照地点')}</summary><label>{tx('纬度 °')}<input data-1p-ignore type="number" min="-90" max="90" step=".01" value={sun.latitude} onChange={e=>changeOptions({sun:{...sun,latitude:Number(e.target.value)}})}/></label><label>{tx('经度 °')}<input data-1p-ignore type="number" min="-180" max="180" step=".01" value={sun.longitude} onChange={e=>changeOptions({sun:{...sun,longitude:Number(e.target.value)}})}/></label><label>{tx('时区 UTC')}<input data-1p-ignore type="number" min="-12" max="14" step=".5" value={sun.utcOffset} onChange={e=>changeOptions({sun:{...sun,utcOffset:Number(e.target.value)}})}/></label></details>}<small>{solar?tx('太阳方位 {0}° · 高度 {1}°',solar.azimuth.toFixed(1),solar.elevation.toFixed(1)):tx('请填写有效地点和时间')}</small>{solar&&!solar.daylight&&<small>{tx('太阳在地平线以下，不产生直射光与日照阴影。')}</small>}</section>
   {!coreEdition&&<section className="photo-render-group photo-output-group">
    <h3>{tx('渲染设置')}</h3>
  <label>{tx('品质')}<select value={options.quality} onChange={e=>changeOptions({quality:e.target.value as PhotoRenderOptions['quality']})}><option value="simple">{tx('简单')}</option><option value="standard">{tx('标准')}</option><option value="fine">{tx('精细')}</option></select></label><label>{tx('出图尺寸')}<select value={options.maxEdge??(options.quality==='fine'?4096:2048)} onChange={e=>changeOptions({maxEdge:Number(e.target.value) as PhotoRenderOptions['maxEdge']})}><option value="2048">{tx('2K · 快速')}</option><option value="4096">{tx('4K · 推荐')}</option><option value="8192">{tx('8K · 高分辨率')}</option></select></label></section>}
@@ -379,14 +393,16 @@ export function PhotoMatchPanel({roofs,site,initialId,base,overlays,items,sitePo
    <button onClick={()=>{setCustomDraft(null);setTool('pointPhoto');}}>{tx('取消')}</button>
   </>:<>
   {error&&<small role="alert">{error}</small>}
+  {ready&&!hasRenderArrays&&<small role="status">{tx('当前屋面还没有组件，请先完成布置。')}</small>}
   {marking&&!solve?.camera&&<small>{tx('至少配对 4 个点')}</small>}
-  <button className="photo-save" disabled={!view||busy||drawingMask||(marking&&(!solve?.camera||!!next))} onClick={()=>{
+  <button className="photo-save" disabled={!view||busy||drawingMask||(ready&&!hasRenderArrays)||(marking&&(!solve?.camera||!!next))} onClick={()=>{
    if(ready){fitPreview();setPreviewPan(false);void generate();return;}
    if(marking){setConfirmed(pointKey);setMarkingView(undefined);return;}
    if(visibleSites.length<4){startCustom();return;}
    if(referenceMode==='corners')updateView({pointMode:'corners'});
    setMarkingView(view?.id);setActive(next?.id);setTool('pointPhoto');
   }}>{ready&&<Icon name="camera"/>}{ready?tx('开始渲染'):marking?tx('完成标注'):tx('开始标注')}</button>
+  {ready&&<button disabled={busy||drawingMask} onClick={()=>{setConfirmed(undefined);setMarkingView(view?.id);setTool('pointPhoto');}}>{tx('重新标注')}</button>}
   {m&&<button disabled={busy||drawingMask} onClick={()=>void saveAnnotations()}><Icon name="save"/>{tx('保存项目')}</button>}
  </>}
  </div>}
