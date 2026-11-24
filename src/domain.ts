@@ -1,0 +1,486 @@
+import {polygonContains,polygonsOverlap} from './polygon';
+import { MAX_PROJECT_PANELS } from './project-limits';
+import {tx} from './i18n';
+export type ModuleSpec = { kind?: "standard"|"lightweight"; width: number; length: number; power: number; gap: number };
+export const DEFAULT_FRONT_HEIGHT = .45;
+export const PITCHED_PANEL_OFFSET = .045;
+export const defaultModule: ModuleSpec = { kind:"standard", width: 1.134, length: 2.278, power: 550, gap: .02 };
+export const validModule = (m: ModuleSpec) => (m.kind===undefined||["standard","lightweight"].includes(m.kind)) && [m.width,m.length,m.power,m.gap].every(Number.isFinite) && m.width >= .2 && m.width <= 5 && m.length >= .2 && m.length <= 5 && m.power > 0 && m.power <= 2000 && m.gap >= 0 && m.gap <= 2;
+export type Params = {
+  /** Module lower-edge height above its supporting roof; omitted in legacy files. */
+  frontHeight?:number;
+  /** Height retained when shading removes the lower rows of a connected table. */
+  tableHeightOffset?:number;
+  mounting?:"carport";
+  elevation?:number;
+  surface?: { sx:number; sz:number; height:number };
+  /** Single carport frame style; omitted = straight H frame. */
+  carportFrame?:"curved";
+  module?: ModuleSpec;
+  x: number;
+  z: number;
+  rows: number;
+  columns: number;
+  tilt: number;
+  azimuth: number;
+  portrait: boolean;
+  rowGap?: number;
+  // Omitted in legacy projects: those rows retain their independent tilt.
+  connectedRows?: boolean;
+};
+export const initial: Params = {
+  x: 0,
+  z: 0,
+  rows: 3,
+  columns: 6,
+  tilt: 20,
+  azimuth: 180,
+  portrait: true,
+};
+export const rad = (n: number) => (n * Math.PI) / 180;
+export function geometry(p: Params) {
+  const m = p.module ?? defaultModule;
+  const w = p.portrait ? m.width : m.length, l = p.portrait ? m.length : m.width;
+  if(p.surface){
+    const {sx,sz,height}=p.surface;
+    const kx=1/Math.sqrt(1+sx*sx),kz=1/Math.sqrt(1+sz*sz);
+    const width=(p.columns*w+(p.columns-1)*m.gap)*kx;
+    const depth=(p.rows*l+(p.rows-1)*m.gap)*kz;
+    const panels=Array.from({length:p.rows*p.columns},(_,i)=>{
+      const x=((i%p.columns)*(w+m.gap)-(p.columns-1)*(w+m.gap)/2)*kx;
+      const z=(Math.floor(i/p.columns)*(l+m.gap)-(p.rows-1)*(l+m.gap)/2)*kz;
+      return {x,z,y:height+PITCHED_PANEL_OFFSET+sx*x+sz*z};
+    });
+    return {w,l,width,depth,panels,yaw:rad(180-p.azimuth),tilt:-Math.atan(sz),roll:Math.atan(sx)};
+  }
+  const depth = l * Math.cos(rad(p.tilt)),
+    width = p.columns * w + (p.columns - 1) * m.gap;
+  const slopeLength = p.rows * l + (p.rows - 1) * m.gap;
+  const totalDepth = p.connectedRows ? slopeLength * Math.cos(rad(p.tilt)) : p.rows * depth + (p.rows - 1) * (p.rowGap ?? 1);
+  const panels = Array.from({ length: p.rows * p.columns }, (_, i) => ({
+    x: (i % p.columns) * (w + m.gap) - (width - w) / 2,
+    y: (p.elevation??0) + (p.frontHeight??0.3) + (p.tableHeightOffset??0) + (p.connectedRows ? slopeLength - Math.floor(i / p.columns) * (l + m.gap) - l / 2 : l / 2) * Math.sin(rad(p.tilt)),
+    z: p.connectedRows ? (Math.floor(i / p.columns) * (l + m.gap) + l / 2 - slopeLength / 2) * Math.cos(rad(p.tilt)) : Math.floor(i / p.columns) * (depth + (p.rowGap ?? 1)) - (totalDepth - depth) / 2,
+  }));
+  return {
+    w,
+    l,
+    width,
+    depth: totalDepth,
+    panels,
+    yaw: rad(180 - p.azimuth),
+    tilt: rad(p.tilt),
+    roll: 0,
+  };
+}
+export function valid(p: Params) {
+  return (
+    [p.x, p.z, p.rows, p.columns, p.tilt, p.azimuth].every(Number.isFinite) &&
+    (p.frontHeight===undefined||(Number.isFinite(p.frontHeight)&&p.frontHeight>=.2&&p.frontHeight<=10)) &&
+    (p.tableHeightOffset===undefined||(p.connectedRows===true&&Number.isFinite(p.tableHeightOffset)&&p.tableHeightOffset>=0)) &&
+    (p.mounting===undefined||p.mounting==="carport") &&
+    (p.carportFrame===undefined||p.carportFrame==="curved") &&
+    (!p.surface || [p.surface.sx,p.surface.sz,p.surface.height].every(Number.isFinite) && Math.abs(p.surface.sx)<=1 && Math.abs(p.surface.sz)<=1) &&
+    typeof p.portrait === "boolean" &&
+    (p.connectedRows === undefined || typeof p.connectedRows === 'boolean') &&
+    (!p.module || validModule(p.module)) &&
+    Number.isInteger(p.rows) &&
+    Number.isInteger(p.columns) &&
+    (p.rowGap === undefined || (Number.isFinite(p.rowGap) && p.rowGap >= 0)) &&
+    p.rows > 0 &&
+    p.columns > 0 &&
+    p.rows * p.columns <= MAX_PROJECT_PANELS &&
+    p.tilt >= 0 &&
+    p.tilt <= 60
+  );
+}
+export type PVArray = Params & { hostObstacleId?:string; id: string; name: string };
+export type Point = { x: number; z: number };
+export type Rect = Point & { width: number; depth: number; yaw: number; outline?:Point[] };
+export type ArrayGrid = { basis: "roof"|"element"; columns: number; rows: number; rowGap: number };
+export type ObstacleArrayGroup = { grid?: ArrayGrid; id: string; name: string; count: number; axis: 'width'|'depth'; gap: number; index: number };
+export type Obstacle = Rect & { topLayout?:{enabled:boolean;tilt:number;edge:number}; kind?:"obstacle"|"keepout"; baseHeight?:number; arrayGroup?:ObstacleArrayGroup; id: string; name: string; height: number };
+export const roof = { width: 30, depth: 20 };
+export const obstacles: Obstacle[] = [
+  {
+    id: "equipment",
+    name: tx('设备基础'),
+    x: 8,
+    z: -5,
+    width: 4,
+    depth: 3,
+    yaw: 0,
+    height: 2,
+  },
+  {
+    id: "skylight",
+    name: tx('天窗'),
+    x: -9,
+    z: 5,
+    width: 3,
+    depth: 2,
+    yaw: rad(-20),
+    height: 0.6,
+  },
+];
+export const defaultArrays = (): PVArray[] => [
+  { ...initial, rowGap: 2.32, id: "array-1", name: tx('阵列 01'), x: -5, z: -2 },
+  { ...initial, rowGap: 2.32, id: "array-2", name: tx('阵列 02'), x: 5, z: 3 },
+];
+export function footprint(p: Params): Rect {
+  const g = geometry(p);
+  return { x: p.x, z: p.z, width: g.width, depth: g.depth, yaw: g.yaw };
+}
+export function corners(r: Rect): Point[] {
+  const c = Math.cos(r.yaw),
+    s = Math.sin(r.yaw);
+  if(r.outline)return r.outline.map(({x,z})=>({x:r.x+x*c+z*s,z:r.z-x*s+z*c}));
+  return [
+    [-1, -1],
+    [1, -1],
+    [1, 1],
+    [-1, 1],
+  ].map(([a, b]) => {
+    const x = (a * r.width) / 2,
+      z = (b * r.depth) / 2;
+    return { x: r.x + x * c + z * s, z: r.z - x * s + z * c };
+  });
+}
+const EPS = 1e-7; // metres; touching edges are allowed, not positive-area overlap.
+export function overlaps(a: Rect, b: Rect): boolean {
+  if(a.outline||b.outline)return polygonsOverlap(corners(a),corners(b));
+  const ac = corners(a),
+    bc = corners(b);
+  for (const r of [a, b])
+    for (const axis of [
+      { x: Math.cos(r.yaw), z: -Math.sin(r.yaw) },
+      { x: Math.sin(r.yaw), z: Math.cos(r.yaw) },
+    ]) {
+      const ap = ac.map((p) => p.x * axis.x + p.z * axis.z),
+        bp = bc.map((p) => p.x * axis.x + p.z * axis.z);
+      if (
+        Math.min(Math.max(...ap), Math.max(...bp)) -
+          Math.max(Math.min(...ap), Math.min(...bp)) <=
+        EPS
+      )
+        return false;
+    }
+  return true;
+}
+export const outsideRoof = (r: Rect, boundary:import("./polygon").Footprint = roof) =>
+  boundary.outline?!polygonContains(boundary.outline,corners(r)):
+  corners(r).some(
+    (p) =>
+      Math.abs(p.x) > boundary.width / 2 + EPS ||
+      Math.abs(p.z) > boundary.depth / 2 + EPS,
+  );
+export type Issue = {
+  kind: "boundary" | "array" | "obstacle" | "shadow";
+  ids: string[];
+  text: string;
+};
+export function detect(
+  arrays: PVArray[],
+  objects: Obstacle[] = obstacles,
+  boundary = roof,
+): Issue[] {
+  const rects = arrays.map(footprint),
+    issues: Issue[] = [];
+  arrays.forEach((a, i) => {
+    if (outsideRoof(rects[i], boundary))
+      issues.push({
+        kind: "boundary",
+        ids: [a.id],
+        text: tx('{0} 超出屋面边界',a.name),
+      });
+    if(a.hostObstacleId){const host=objects.find(o=>o.id===a.hostObstacleId);if(!host?.topLayout?.enabled||corners(rects[i]).some(p=>{const x=p.x-host.x,z=p.z-host.z,c=Math.cos(host.yaw),s=Math.sin(host.yaw);return Math.abs(x*c-z*s)>host.width/2+1e-7||Math.abs(x*s+z*c)>host.depth/2+1e-7;}))issues.push({kind:'boundary',ids:[a.id],text:tx('{0} 超出附属建筑顶部或顶部布置已关闭',a.name)});}
+    objects.forEach((o) => {
+      if (a.hostObstacleId!==o.id && overlaps(rects[i], o))
+        issues.push({
+          kind: "obstacle",
+          ids: [a.id, o.id],
+          text: tx('{0} 与{1}占地重叠',a.name,o.name),
+        });
+    });
+    for (let j = i + 1; j < arrays.length; j++)
+      if (overlaps(rects[i], rects[j]))
+        issues.push({
+          kind: "array",
+          ids: [a.id, arrays[j].id],
+          text: tx('{0} 与{1}占地重叠',a.name,arrays[j].name),
+        });
+  });
+  return issues;
+}
+export function copyArray(a: PVArray, id: string, name: string): PVArray {
+  return { ...a, id, name, x: a.x + 1 };
+}
+export type Mode = "top" | "3d";
+export type LayoutImageScope='fit'|'screen'|'site';
+export type LayoutImageOptions={scope:LayoutImageScope;siteId?:string;includeBase:boolean;includeLabels:boolean;includeGrid:boolean};
+export type SceneSite = Rect & {layoutArea?:Point[];markerPitch?:import("./pitched-roof").RoofPitch;id:string;name:string;planNumber?:number;/** Installed kWp, shown in the roof's 2D tag. */capacity?:number;wallHeight:number;flatHeight?:number; carport?:import("./carport").CarportOptions; pitch?:import("./pitched-roof").RoofPitch};
+export type ViewProps = {
+  /** Where north points on screen (degrees clockwise from up), after every view change in 2D and 3D. */
+  onNorth?:(degrees:number)=>void;
+  /** 2D measure tool in use, a counter that clears every measurement when it changes, and the number of measurements shown. */
+  measureTool?:import('./measure').MeasureTool|null;measureClear?:number;onMeasureCount?:(count:number)=>void;
+  /** 2D view: metres per screen pixel, after every pan / zoom / resize. */
+  onScale?:(metersPerPixel:number)=>void;
+  showSiteLabels?:boolean;
+  onCaptureReady?:(capture:((options?:LayoutImageOptions)=>string)|null)=>void;
+  onDrawingView?:(v:{x:number;y:number;width:number;height:number;viewportHeight?:number})=>void;
+  restoreDrawingView?:{x:number;y:number;width:number;height:number;viewportHeight?:number};
+  sites?: SceneSite[];
+  focus?: Point;
+  imageOverlays?:import('./image-overlays').ImageOverlay[];
+  editingOverlay?:boolean;selectedOverlayId?:string|null;
+  baseImage?: import("./base-image").BaseImage;
+  wallHeight?: number;
+  solarHour?: number;
+  winterCheck?: Float32Array;
+  shadowZones?: import("./shadow-zones").ShadowZone[];
+  showShadows?: boolean;
+  roof?: typeof roof;
+  obstacles?: Obstacle[];
+  visual?: import("./render-options").VisualOptions;
+  arrays: PVArray[];
+  selectedId: string | null;
+  selectedObjectId?:string|null;
+  selectedObjectIds?:string[];
+  showGrid?:boolean;
+  selectedSiteId?:string;
+  directionMarkerColor?:string;
+  showPitchMarker?:boolean;
+  layoutMarker?:import('./layout-direction').LayoutMarker;
+  onEditObject?:(id:string)=>void;
+  onObjectMenu?:(id:string,x:number,y:number)=>void;
+  issues: Issue[];
+  mode: Mode;
+  navigationMode?:'select'|'pan';
+  viewCommand?:{id:number;factor:number};
+  fitSignal?:number;
+  /** 3D only: orbit at standing eye height, so the camera can look up under carports. */
+  eyeLevel?:boolean;
+  /** `add`: Shift / Ctrl click adds or removes an area from the selection. */
+  onSelect: (id: string | null, add?: boolean) => void;
+  /** 2D drag box on empty canvas: the rectangle on screen while dragging (null when done), then the two world corners. */
+  onBoxSelect?:{update:(r:{left:number;top:number;width:number;height:number}|null)=>void;finish:(a:Point,b:Point,add:boolean)=>void};
+  /** 2D: areas picked together with the current one (Shift-click or drag box). */
+  pickedSiteIds?:string[];
+  /** 2D: objects picked together with the selected one (Shift-click), world ids. */
+  pickedObjectIds?:string[];
+  onMove: (id: string, x: number, z: number) => void;
+  reset: number;
+};
+export function fittedPlanView(focus:Point|undefined,roof:{width:number;depth:number},aspect:number){
+  return {x:focus?.x??0,z:focus?.z??0,span:Math.max(roof.depth*1.12,roof.width*1.12/Math.max(aspect,.01),10)};
+}
+
+export const viewStart = (aspect: number) => ({
+  x: 0,
+  z: 0,
+  span: Math.max(28, 36 / aspect),
+  distance: Math.max(43, 34 / aspect),
+  yaw: 0.65,
+  pitch: 0.85,
+  /** Height of the point the camera orbits; below 0 in the eye-level view. */
+  target: 0,
+});
+export type CameraView = ReturnType<typeof viewStart>;
+export const orbitPosition = (v: CameraView) => ({
+  x: v.x + v.distance * Math.cos(v.pitch) * Math.sin(v.yaw),
+  y: v.target + v.distance * Math.sin(v.pitch),
+  z: v.z + v.distance * Math.cos(v.pitch) * Math.cos(v.yaw),
+});
+export function orbit(v: CameraView, dx: number, dy: number) {
+  v.yaw -= dx * 0.006;
+  v.pitch = Math.max(v.target < 0 ? -0.7 : 0.12, Math.min(1.48, v.pitch + dy * 0.006));
+  keepAboveGround(v);
+}
+export function zoomView(v: CameraView, f: number) {
+  v.span = Math.max(5, Math.min(2000, v.span * f));
+  v.distance = Math.max(v.target < 0 ? 1.5 : 8, Math.min(3000, v.distance * f));
+  keepAboveGround(v);
+}
+/** Eye-level view: orbit a point 1.6 m above the ground (ground is y = -3.5), looking level; off returns to the normal orbit limits. */
+export function eyeLevel(v: CameraView, on: boolean) {
+  if (on) { v.target = -1.9; v.distance = Math.min(v.distance, 14); v.pitch = 0.05; }
+  else { v.target = 0; v.pitch = Math.max(0.12, v.pitch); v.distance = Math.max(8, v.distance); }
+  keepAboveGround(v);
+}
+/** The camera never goes below 0.3 m above the ground. */
+function keepAboveGround(v: CameraView) {
+  const low = -3.2;
+  if (v.target + v.distance * Math.sin(v.pitch) < low) v.pitch = Math.asin(Math.max(-1, (low - v.target) / v.distance));
+}
+// Fixed north-up orthographic view. Engine adapters supply ray/roof intersections.
+export function bindPointer(
+  canvas: HTMLCanvasElement,
+  api: {
+    point: (x: number, y: number) => { x: number; z: number } | null;
+    hit: (x: number, y: number) => string | null;
+    position: (id: string) => Point;
+    select: (id: string | null, add?: boolean) => void;
+    move: (id: string, x: number, z: number) => void;
+    box?:{update:(r:{left:number;top:number;width:number;height:number}|null)=>void;finish:(a:Point,b:Point,add:boolean)=>void};
+    mode: () => Mode;
+    panMode?:()=>boolean;
+    orbit: (dx: number, dy: number) => void;
+    pan: (x: number, z: number) => void;
+    zoom: (factor: number) => void;
+    edit?:(id:string)=>void;
+    context?:(id:string,x:number,y:number)=>void;
+    /** 2D measure tools: while `active`, left clicks measure instead of selecting; panning and zoom still work. */
+    measure?:{active:()=>boolean;down:(p:Point,straight:boolean)=>void;move:(p:Point|null,straight:boolean)=>void;finish:()=>void};
+  },
+) {
+  let drag: {
+    id: number;
+    kind: "move" | "pan" | "orbit" | "box";
+    /** Moves start only after a few pixels, so a click never nudges an area. */
+    moved?: boolean;
+    add?: boolean;
+    /** Pressed on a direction / pitch marker: a click turns it, a drag moves the area. */
+    marker?: boolean;
+    arrayId: string | null;
+    mouse: Point;
+    startClient?: Point;
+    mode: Mode;
+    start: { x: number; z: number };
+    origin: { x: number; z: number };
+  } | null = null;
+  // 2D: an arrow that selects; the hand only while panning (pan tool, middle button or Space held). 3D keeps the hand.
+  let space = false;
+  const idle = () => api.mode() === "3d" || api.panMode?.() || space ? "grab" : "default";
+  const end = () => {
+    if (drag?.kind === "box") api.box?.update(null);
+    if (drag && canvas.hasPointerCapture(drag.id))
+      canvas.releasePointerCapture(drag.id);
+    drag = null;
+    canvas.style.cursor = idle();
+  };
+  const up = (e: PointerEvent) => {
+    if (drag?.kind === "box" && drag.id === e.pointerId) {
+      const a = api.point(drag.mouse.x, drag.mouse.z), b = api.point(e.clientX, e.clientY);
+      if (a && b && Math.hypot(e.clientX - drag.mouse.x, e.clientY - drag.mouse.z) > 4) api.box?.finish(a, b, !!drag.add);
+    }
+    if (drag?.kind === "orbit" && drag.id === e.pointerId && e.button === 0 && drag.startClient && Math.hypot(e.clientX - drag.startClient.x, e.clientY - drag.startClient.z) <= 5) api.select(api.hit(e.clientX, e.clientY), drag.add);
+    if (drag?.marker && !drag.moved && drag.id === e.pointerId) api.select(drag.arrayId);
+    end();
+  };
+  const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+  const keyDown = (e: KeyboardEvent) => {if (e.key === " " && !e.repeat && !typing(e.target) && canvas.matches(":hover")) {space = true;e.preventDefault();if (!drag) canvas.style.cursor = "grab";}};
+  const keyUp = (e: KeyboardEvent) => {if (e.key === " ") {space = false;if (!drag) canvas.style.cursor = idle();}};
+  const down = (e: PointerEvent) => {
+    if (drag || ![0, 1].includes(e.button)) return;
+    if (e.button === 0 && !space && !api.panMode?.() && api.measure?.active()) {
+      const p = api.point(e.clientX, e.clientY);
+      if (p) api.measure.down(p, e.shiftKey);
+      e.preventDefault();
+      return;
+    }
+    let kind: "move" | "pan" | "orbit" | "box" =
+      e.button === 1 || space || api.panMode?.() ? "pan" : api.mode() === "3d" ? "orbit" : "move";
+    const p = api.point(e.clientX, e.clientY);
+    if (!p && kind !== "orbit") return;
+    const arrayId = kind === "move" ? api.hit(e.clientX, e.clientY) : null;
+    const add = e.shiftKey || e.ctrlKey || e.metaKey;
+    const marker = kind === "move" && !!arrayId && /^@[pd]\//.test(arrayId);
+    if (kind === "move" && marker) {
+      if (add) {api.select("@s/" + arrayId!.slice(3), true);return;}
+    } else if (kind === "move") {
+      api.select(arrayId, add);
+      if (!arrayId) {
+        if (!api.box) return;
+        kind = "box";
+      } else if (add) return;
+    }
+    e.preventDefault();
+    drag = {
+      id: e.pointerId,
+      kind,
+      add,
+      marker,
+      arrayId,
+      mode: api.mode(),
+      mouse: { x: e.clientX, z: e.clientY },
+      startClient: { x: e.clientX, z: e.clientY },
+      start: p ?? { x: 0, z: 0 },
+      origin: arrayId ? api.position(arrayId) : { x: 0, z: 0 },
+    };
+    canvas.setPointerCapture(e.pointerId);
+    canvas.style.cursor = kind === "box" ? "crosshair" : kind === "move" ? "move" : "grabbing";
+  };
+  const move = (e: PointerEvent) => {
+    if (!drag) canvas.style.cursor = idle();
+    if (!drag && !space && api.measure?.active()) {
+      canvas.style.cursor = "crosshair";
+      api.measure.move(api.point(e.clientX, e.clientY), e.shiftKey);
+      return;
+    }
+    if (!drag || drag.id !== e.pointerId) return;
+    if (drag.mode !== api.mode()) {
+      end();
+      return;
+    }
+    if (drag.kind === "orbit") {
+      api.orbit(e.clientX - drag.mouse.x, e.clientY - drag.mouse.z);
+      drag.mouse = { x: e.clientX, z: e.clientY };
+      return;
+    }
+    if (drag.kind === "box") {
+      const r = canvas.getBoundingClientRect();
+      api.box?.update({left: Math.min(drag.mouse.x, e.clientX) - r.left, top: Math.min(drag.mouse.z, e.clientY) - r.top, width: Math.abs(e.clientX - drag.mouse.x), height: Math.abs(e.clientY - drag.mouse.z)});
+      return;
+    }
+    if (drag.kind === "move" && !drag.moved) {
+      if (Math.hypot(e.clientX - drag.mouse.x, e.clientY - drag.mouse.z) < 4) return;
+      drag.moved = true;
+    }
+    const p = api.point(e.clientX, e.clientY);
+    if (!p) return;
+    if (drag.kind === "move")
+      api.move(
+        drag.arrayId!,
+        drag.origin.x + p.x - drag.start.x,
+        drag.origin.z + p.z - drag.start.z,
+      );
+    else api.pan(drag.start.x - p.x, drag.start.z - p.z);
+  };
+  const wheel = (e: WheelEvent) => {
+    e.preventDefault();
+    if (!drag)
+      api.zoom(Math.exp(Math.max(-200, Math.min(200, e.deltaY)) * 0.001));
+  };
+  const context = (e: MouseEvent) => {e.preventDefault();if(api.measure?.active()){api.measure.finish();return;}if(api.mode()==='top'){const id=api.hit(e.clientX,e.clientY);if(id)api.context?.(id,e.clientX,e.clientY);}};
+  const doubleClick=(e:MouseEvent)=>{if(api.measure?.active()){api.measure.finish();return;}const id=api.hit(e.clientX,e.clientY);if(id&&!id.startsWith('@p/')&&!id.startsWith('@d/')&&!id.startsWith('@i/')){end();api.edit?.(id);}};
+  canvas.addEventListener("pointerdown", down);
+  canvas.addEventListener("pointermove", move);
+  canvas.addEventListener("pointerup", up);
+  canvas.addEventListener("pointercancel", end);
+  canvas.addEventListener("lostpointercapture", end);
+  canvas.addEventListener("wheel", wheel, { passive: false });
+  canvas.addEventListener("contextmenu", context);
+  canvas.addEventListener('dblclick',doubleClick);
+  window.addEventListener("blur", end);
+  window.addEventListener("keydown", keyDown);
+  window.addEventListener("keyup", keyUp);
+  canvas.style.cursor = idle();
+  return Object.assign(
+    () => {
+      end();
+      canvas.removeEventListener("pointerdown", down);
+      canvas.removeEventListener("pointermove", move);
+      canvas.removeEventListener("pointerup", up);
+      canvas.removeEventListener("pointercancel", end);
+      canvas.removeEventListener("lostpointercapture", end);
+      canvas.removeEventListener("wheel", wheel);
+      canvas.removeEventListener("contextmenu", context);
+      canvas.removeEventListener('dblclick',doubleClick);
+      window.removeEventListener("blur", end);
+      window.removeEventListener("keydown", keyDown);
+      window.removeEventListener("keyup", keyUp);
+    },
+    { cancel: end },
+  );
+}

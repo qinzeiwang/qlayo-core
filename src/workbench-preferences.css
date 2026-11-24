@@ -1,0 +1,55 @@
+.workbench-preferences{
+ --field-height:24px;--row-height:32px;--value-width:88px;
+ display:flex;flex-direction:column;box-sizing:border-box;width:min(600px,calc(100vw - 24px));height:min(360px,calc(100dvh - 24px));overflow:hidden;
+ background:var(--pv-surface);border:1px solid var(--pv-border);border-radius:8px;box-shadow:var(--pv-shadow-float);color:var(--pv-text);font:400 13px/18px var(--pv-font-sans)
+}
+.workbench-preferences *{box-sizing:border-box}
+.workbench-preferences .settings-heading,.workbench-preferences .module-library-nav header,.preferences-calibrate{display:flex;align-items:center;justify-content:space-between}
+.workbench-preferences .settings-heading{height:44px;flex:none;padding:0 16px}
+.workbench-preferences h2{margin:0;font:600 14px/20px var(--pv-font-sans)}
+.workbench-preferences h3{margin:0;font:600 12px/16px var(--pv-font-sans);color:var(--pv-text-secondary)}
+.workbench-preferences button{font:inherit;color:inherit;border:0;border-radius:4px;background:transparent;padding:0 8px;min-height:28px;cursor:pointer}
+.workbench-preferences button:hover:not(:disabled){background:var(--pv-surface-slot)}
+.workbench-preferences button:disabled{opacity:.5;cursor:default}
+.workbench-preferences :is(.settings-heading,.module-library-nav header) button{width:28px;height:28px;display:grid;place-items:center;padding:0}
+.workbench-preferences .ui-icon[data-icon]{width:16px;height:16px}
+.workbench-preferences .preferences-tabs{display:flex;flex:none;gap:16px;margin:0 16px;border-bottom:1px solid var(--pv-border)}
+.workbench-preferences .preferences-tabs button{height:32px;padding:0;border-radius:0;border-bottom:2px solid transparent;color:var(--pv-text-secondary)}
+.workbench-preferences .preferences-tabs [aria-selected=true]{color:var(--pv-text);font-weight:600;border-color:currentColor}
+.workbench-preferences .settings-body{flex:1;min-height:0;overflow:auto;padding:12px 16px}
+.workbench-preferences .module-library-layout{margin:0;grid-template-columns:minmax(100px,28%) minmax(0,1fr);gap:16px}
+.workbench-preferences .module-library-nav header h3{flex:1}
+.workbench-preferences .module-library-nav ul{gap:0;margin-top:4px}
+.workbench-preferences .module-library-nav li button{width:100%;height:32px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.workbench-preferences .module-library-nav [aria-current=true]{background:var(--pv-surface-slot);font-weight:600}
+.workbench-preferences .module-library-editor{min-width:0;padding:0 0 0 16px;border:0;border-left:1px solid var(--pv-border)}
+.workbench-preferences .module-library-editor h3{display:flex;align-items:center;height:28px;margin-bottom:4px}
+.workbench-preferences .module-library-item{margin:0;padding:0}
+.workbench-preferences .module-library-fields{grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px}
+.workbench-preferences .module-library-fields label:first-child{grid-column:1/-1}
+.workbench-preferences :is(.module-library-fields label,.module-library-heading,.preferences-project label,.preferences-calibrate){display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:var(--row-height);margin:0;font:inherit;color:var(--pv-text-secondary)}
+.workbench-preferences :is(input,select){min-width:0;min-height:0;height:var(--field-height);margin:0;padding:0 6px;border:1px solid var(--pv-border);border-radius:4px;background:var(--pv-surface);color:var(--pv-text);font:400 13px/18px var(--pv-font-sans);font-variant-numeric:tabular-nums;text-align:right}
+.workbench-preferences input[type=number]{appearance:textfield}
+.workbench-preferences input::-webkit-inner-spin-button{appearance:none}
+.workbench-preferences :is(.module-library-heading input,.module-library-fields select,.preferences-project input){width:60%;flex:0 1 60%;text-align:left}
+.workbench-preferences .preferences-project input[type=number]{text-align:right;width:var(--value-width);flex:0 0 var(--value-width)}
+.workbench-preferences .spec-amount,.preferences-defaults .property-row{position:relative}
+.workbench-preferences .spec-amount{width:var(--value-width);max-width:65%}
+.workbench-preferences :is(.spec-amount,.preferences-defaults) input{width:100%;padding-right:26px}
+.workbench-preferences :is(.spec-amount,.property-row)>small{position:absolute;right:6px;top:50%;transform:translateY(-50%);margin:0;font:400 12px/18px var(--pv-font-sans);color:var(--pv-text-tertiary);pointer-events:none}
+.workbench-preferences .default-module-action{background:var(--pv-surface-slot)}
+.preferences-project,.preferences-defaults{max-width:400px;margin:0 auto}
+.workbench-preferences .preferences-defaults .property-row{display:grid;align-items:center;grid-template-columns:16px minmax(0,1fr) var(--value-width);height:32px;gap:8px;margin:0;padding:0;background:transparent}
+.workbench-preferences .property-row .property-spacer{font:inherit;color:var(--pv-text-secondary)}
+.preferences-calibrate{border-top:1px solid var(--pv-border);margin-top:8px;padding-top:8px}
+@media(max-width:520px){.workbench-preferences .module-library-layout{grid-template-columns:minmax(84px,26%) minmax(0,1fr);gap:8px}.workbench-preferences .module-library-editor{padding-left:8px}.workbench-preferences .module-library-fields label{flex-wrap:wrap;gap:2px}.workbench-preferences .spec-amount{max-width:100%}}
+.workbench-preferences :is(.module-library-item,.preferences-project,.preferences-defaults) :is(input,select){
+ height:var(--field-height)!important;min-height:var(--field-height)!important;margin:0!important;padding:0 6px!important;
+ border:1px solid var(--pv-border)!important;border-radius:4px!important;background:var(--pv-surface)!important;
+ font:400 13px/18px var(--pv-font-sans)!important;font-variant-numeric:tabular-nums!important
+}
+.workbench-preferences :is(.spec-amount,.preferences-defaults .property-row) input{padding-right:26px!important}
+.workbench-preferences .spec-amount.is-wide-unit input{padding-right:34px!important}
+.workbench-preferences .preferences-calibrate button{background:var(--pv-surface-slot);border:1px solid var(--pv-border)}
+.workbench-preferences .preferences-calibrate button:hover:not(:disabled){background:var(--pv-surface-hover);border-color:var(--pv-border-strong)}
+.workbench-preferences .preferences-project label{padding:0;margin:0}

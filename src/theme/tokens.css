@@ -1,0 +1,119 @@
+:root {
+  color-scheme: light;
+
+  /* Neutral surfaces (Forma / Figma Light Studio) */
+  --pv-bg: #f0f1f2;
+  --pv-surface: #ffffff;
+  --pv-surface-subtle: #f3f4f6;
+  --pv-surface-slot: #f2f3f5;
+  --pv-surface-hover: #eaecef;
+  --pv-surface-raised: #ffffff;
+
+  /* Text */
+  --pv-text: #141518;
+  --pv-text-secondary: #5a5e66;
+  --pv-text-tertiary: #8e939e;
+  --pv-text-inverse: #ffffff;
+
+  /* Lines */
+  --pv-border: rgba(20, 21, 24, 0.075);
+  --pv-border-strong: rgba(20, 21, 24, 0.15);
+  --pv-divider: rgba(20, 21, 24, 0.075);
+
+  /* Accent (Obsidian Mono) and semantic colors */
+  --pv-accent: #18191c;
+  --pv-accent-hover: #27292e;
+  --pv-accent-active: #0f1012;
+  --pv-accent-soft: rgba(24, 25, 28, 0.065);
+  --pv-accent-border: rgba(24, 25, 28, 0.22);
+  --pv-solar: #d97706;
+  --pv-success: #0d9488;
+  --pv-success-soft: #e6f5f3;
+  --pv-warning: #d97706;
+  --pv-warning-soft: #fef3c7;
+  --pv-danger: #e11d48;
+  --pv-danger-soft: #ffe4e6;
+  --pv-info: #475569;
+  --pv-info-soft: #f1f5f9;
+
+  /* Typography */
+  --pv-font-sans: "Inter Variable", "Noto Sans SC Variable", sans-serif;
+  --pv-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --pv-text-xs: 12px;
+  --pv-text-sm: 13px;
+  --pv-text-md: 14px;
+  --pv-text-lg: 16px;
+  --pv-text-xl: 18px;
+  --pv-title-sm: 24px;
+  --pv-title-md: 30px;
+  --pv-title-lg: 40px;
+  --pv-leading-tight: 1.22;
+  --pv-leading-normal: 1.55;
+
+  /* Spacing */
+  --pv-space-1: 4px;
+  --pv-space-2: 8px;
+  --pv-space-3: 12px;
+  --pv-space-4: 16px;
+  --pv-space-5: 24px;
+  --pv-space-6: 32px;
+  --pv-space-7: 48px;
+
+  /* Geometry */
+  --pv-radius-xs: 4px;
+  --pv-radius-sm: 6px;
+  --pv-radius-md: 8px;
+  --pv-radius-lg: 10px;
+  --pv-radius-pill: 999px;
+  --pv-control-sm: 30px;
+  --pv-control-md: 36px;
+  --pv-control-lg: 44px;
+
+  /* Elevation */
+  --pv-shadow-float: 0 4px 20px -2px rgba(15, 18, 24, 0.08), 0 1px 3px rgba(15, 18, 24, 0.05), 0 0 0 1px rgba(15, 18, 24, 0.06);
+  --pv-shadow-island: 0 4px 20px -2px rgba(15, 18, 24, 0.08), 0 1px 3px rgba(15, 18, 24, 0.05), 0 0 0 1px rgba(15, 18, 24, 0.06);
+  --pv-shadow-popover: 0 12px 36px -4px rgba(15, 18, 24, 0.12), 0 2px 6px rgba(15, 18, 24, 0.06), 0 0 0 1px rgba(15, 18, 24, 0.07);
+  --pv-shadow-modal: 0 18px 60px rgba(15, 18, 24, 0.16), 0 4px 16px rgba(15, 18, 24, 0.08);
+  --pv-ring: 0 0 0 2px rgba(24, 25, 28, 0.14);
+
+  /* Layout */
+  --pv-rail-width: 56px;
+  --pv-sidebar-width: 272px;
+  --pv-content-max: 1280px;
+  --pv-z-dropdown: 30;
+  --pv-z-toast: 50;
+  --pv-z-modal: 80;
+
+  /* Timing */
+  --pv-duration-fast: 120ms;
+  --pv-duration-base: 180ms;
+  --pv-duration-panel: 280ms;
+  --pv-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --pv-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --pv-bg: #111214;
+  --pv-surface: #18191c;
+  --pv-surface-subtle: #202125;
+  --pv-surface-hover: #282a2f;
+  --pv-surface-raised: #1d1e22;
+  --pv-text: #f0f0f2;
+  --pv-text-secondary: #aaacb3;
+  --pv-text-tertiary: #747780;
+  --pv-border: #2b2d32;
+  --pv-border-strong: #3b3e45;
+  --pv-divider: rgba(255, 255, 255, 0.08);
+  --pv-accent: #6c94ff;
+  --pv-accent-hover: #80a3ff;
+  --pv-accent-active: #547fe8;
+  --pv-accent-soft: #1f2c4d;
+  --pv-accent-border: #364f86;
+  --pv-success-soft: #18372b;
+  --pv-warning-soft: #3a2c17;
+  --pv-danger-soft: #3d2022;
+  --pv-info-soft: #202d42;
+  --pv-shadow-float: 0 10px 32px rgba(0, 0, 0, 0.38);
+  --pv-shadow-modal: 0 20px 64px rgba(0, 0, 0, 0.52);
+}

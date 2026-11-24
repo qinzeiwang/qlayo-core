@@ -1,0 +1,168 @@
+/* Region inspector: one typography scale and one flat outline icon language. */
+.editor-float{font-family:var(--font-ui);font-size:12px}
+.editor-float .panel-titlebar{height:34px;min-height:34px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;background:rgba(250,251,252,.82)}
+.editor-float .panel-titlebar h1{font-size:13px;line-height:20px;font-weight:600;margin:0;color:var(--text)}
+.editor-float .panel-titlebar .icon-button{width:24px;height:26px;color:var(--muted);padding:3px}
+.editor-float .panel-titlebar .ui-icon{width:18px;height:18px}
+.panel-titlebar button[aria-expanded=true] .ui-icon{transform:rotate(180deg)}
+.editor-float.is-collapsed{height:36px;min-height:36px}
+.viewport-tools>nav{height:36px;box-sizing:border-box}
+.editor-float .design-tabs[aria-label]{padding:0 10px!important}
+.editor-float .design-tabs button{font-size:12px}
+.editor-float .design-tabs .ui-icon{width:18px;height:18px;stroke-width:2}
+.editor-float .region-section{margin-bottom:12px;padding-bottom:12px}
+.editor-float .region-section h2{height:24px;min-height:24px;line-height:18px;font-size:12px;font-weight:600;color:var(--text-secondary);margin:0 0 8px}
+.editor-float .region-section h2 .ui-icon,.editor-float .region-section .icon-button .ui-icon{width:18px;height:18px;stroke-width:2;color:var(--page-tone)}
+.editor-float .region-section h2 .object-count{font-size:12px;color:var(--muted);font-weight:400}
+.editor-float .region-types button{font-size:12px;font-weight:400;color:var(--text-secondary);height:60px;gap:5px}
+.editor-float .region-types button[aria-pressed=true]{color:var(--site);font-weight:600}
+.editor-float .region-types .ui-icon{width:24px;height:24px;stroke-width:2}
+.editor-float .region-field{font-size:12px;color:var(--text-secondary)}
+.editor-float .region-field input{font-size:12px;color:var(--text);height:30px}
+.editor-float .region-objects{margin-bottom:10px;padding-bottom:10px}
+.editor-float .region-objects:last-child{border-bottom:0;margin-bottom:0;padding-bottom:0}
+.editor-float .region-objects h2{margin-bottom:4px}
+/* Counts sit in one right-aligned column next to the + buttons, whatever the label length. */
+.editor-float .region-objects h2 .object-count{margin-left:auto;min-width:4em;text-align:right}.editor-float .region-objects h2 .object-count+.icon-button{margin-left:4px}
+.object-rows{display:grid;gap:2px;overflow:visible}
+.object-row-wrap{border:1px solid transparent;border-radius:4px}
+.object-row-wrap.is-selected{background:#dcebf5a6;border-color:var(--pv-accent-border)}
+.object-row{display:flex;align-items:center;min-height:30px;gap:4px}
+.editor-float .object-row-select{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;border:0;background:transparent;box-shadow:none;padding:5px 8px;font-size:12px;font-weight:400;color:var(--text-secondary);display:flex;align-items:center;gap:8px}
+.editor-float .object-row-select small{margin-left:auto;color:var(--muted);font-size:12px;font-weight:400}
+.editor-float .object-row-select[aria-pressed=true]{color:var(--site);font-weight:600}
+.editor-float .object-row :is(.object-row-edit,.object-row-delete){width:25px;height:25px;border:0;background:transparent;opacity:0;pointer-events:none;transition:opacity .12s ease,background-color .12s ease,color .12s ease}
+.editor-float .object-row .object-row-delete{margin-right:4px;color:var(--muted)}
+.editor-float .object-row:is(:hover,:focus-within) :is(.object-row-edit,.object-row-delete){opacity:1;pointer-events:auto}
+.editor-float .object-row .object-row-delete:hover{color:var(--pv-danger);background:var(--pv-danger-soft)}
+.object-row-wrap:hover{background:#ffffff60}
+.object-inline-editor{padding:4px 8px 8px}
+.editor-float .object-inline-editor .region-field{display:grid;grid-template-columns:48px 90px;align-items:center;margin:2px 0 8px}
+.object-edit-status{display:flex;gap:5px;align-items:center;margin-top:5px}
+.object-edit-status>span{flex:1;font-size:12px;color:var(--muted)}
+.editor-float .object-edit-status button{font-size:12px;height:27px;padding:4px 7px;white-space:nowrap}
+.editor-float .object-edit-status .cancel-object-edit{background:transparent;color:var(--text-secondary);border:1px solid var(--pv-border-strong)}
+.editor-float .object-edit-status .finish-object-edit{background:var(--site);color:white;border:1px solid var(--site)}
+.editor-float .object-edit-status .finish-object-edit .ui-icon{width:14px;height:14px;color:white}
+.editor-float .object-edit-status .object-delete{background:transparent;border:0;padding:4px 0;width:auto;margin-right:auto;color:var(--pv-danger)}
+.editor-float .object-edit-status .object-delete .ui-icon{color:var(--muted)}
+
+/* Shared roof selectors: compact elevation symbols, no nested pill frame. */
+.new-region .region-types,.editor-float .region-types{display:flex;gap:8px;background:transparent;border:0;padding:0}
+.new-region .region-types button,.editor-float .region-types button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;height:60px;gap:6px;border:1px solid var(--pv-border);border-radius:var(--pv-radius-xs);background:transparent;box-shadow:none;color:var(--pv-text-secondary);font:400 12px var(--font-ui)}
+.new-region .region-types button[aria-pressed=true],.editor-float .region-types button[aria-pressed=true]{background:var(--pv-surface-subtle);border-color:var(--pv-accent-border);color:var(--pv-accent);font-weight:600}
+.new-region .region-type-group{display:block}
+.new-region .region-type-group h3{margin:0 0 8px;font:500 12px var(--font-ui);color:var(--pv-text-secondary)}
+.new-region .region-type-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.new-region .region-type-grid button{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;height:72px;gap:6px;padding:0 4px;border:1px solid var(--pv-border);border-radius:var(--pv-radius-xs);background:transparent;box-shadow:none;color:var(--pv-text-secondary);font:400 12px var(--font-ui)}
+.new-region .region-type-grid button:hover{border-color:var(--pv-border-strong);color:var(--pv-text)}
+.new-region .region-type-grid button[aria-pressed=true]{background:var(--pv-surface-subtle);border-color:var(--pv-accent-border);color:var(--pv-accent);font-weight:600}
+.new-region .region-types .ui-icon,.editor-float .region-types .ui-icon{width:24px;height:24px;stroke-width:1.7}
+.new-region.project-dialog{width:min(380px,calc(100vw - 32px));padding:20px;gap:20px;border-radius:10px}
+.new-region .advanced-heading h2{font:600 15px var(--font-ui);margin:0}
+.new-region .advanced-heading .ui-icon{width:18px;height:18px}
+.new-region>div:last-child{display:flex;justify-content:flex-end;gap:8px}
+.new-region>div:last-child button{font:400 12px var(--font-ui);min-height:32px}
+.obstacle-height-input{display:flex;align-items:center;gap:8px;font-size:12px;white-space:nowrap}
+.obstacle-height-input input{width:72px;height:32px}
+.editor-float .region-section{border-bottom-color:#c9dbe680}
+.editor-float .region-objects h2{font-size:12px;letter-spacing:0}
+.editor-float .object-edit-status .finish-object-edit{display:flex;align-items:center;gap:4px}
+.new-region>div:last-child button:last-child{background:var(--pv-accent);border:1px solid var(--pv-accent);color:#fff}
+
+/* Layout inspector follows the same section hierarchy as Region. */
+.editor-float .layout-inspector h2{font-size:12px;font-weight:600;line-height:24px;color:var(--text-secondary);margin:0 0 8px}
+.editor-float .layout-inspector .module-picker{display:block;margin:0 0 16px;padding:0 0 14px;border-bottom:1px solid #b9d0c280}
+.module-picker-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.editor-float .module-picker-heading h2{margin:0}
+.editor-float .module-library-entry{display:flex;align-items:center;gap:5px;padding:3px 0;background:none;border:0;box-shadow:none;color:var(--page-tone);font:400 11px var(--font-ui)}
+.editor-float .module-library-entry .ui-icon{width:16px;height:16px;stroke-width:1.7}
+.editor-float .module-picker>select{display:block;width:100%;height:32px;margin:0;font-size:12px;border:1px solid var(--pv-border-strong);border-radius:var(--pv-radius-xs);background:#ffffff70}
+.editor-float .module-picker small{display:flex;justify-content:space-between;gap:6px;margin:7px 0 0;font-size:12px;color:var(--muted)}
+.editor-float .layout-rules{margin:0;padding:0;border:0}
+.editor-float .layout-rules .auto-settings{margin:0;padding:0;border:0}
+.editor-float .layout-rules .compact-rules{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin:0 0 12px}
+.editor-float .layout-rules .rule-row{display:flex;flex-direction:column;align-items:stretch;text-align:left;gap:6px;font-size:12px;color:var(--text-secondary);min-width:0;line-height:18px}
+.editor-float .layout-rules .rule-row>span{height:18px;line-height:18px}
+.editor-float .layout-rules input,.editor-float .layout-rules select{width:100%;height:32px!important;font:400 12px var(--font-ui);padding:4px 8px;border-radius:var(--pv-radius-xs);border:1px solid var(--pv-border-strong);background:#ffffff90;margin:0!important;box-sizing:border-box}
+.editor-float .layout-rules .choice-segment{height:32px;width:100%;display:flex;gap:0;padding:2px;border:1px solid var(--pv-border-strong);background:#e0ebe480;border-radius:6px;margin:0;box-sizing:border-box;min-height:32px}
+.editor-float .layout-rules .choice-segment button{flex:1;border:0;border-radius:4px;box-shadow:none;font:400 12px var(--font-ui);padding:0 3px;min-height:0;height:26px;line-height:26px;color:var(--text-secondary);background:transparent}
+.editor-float .layout-rules .choice-segment button[aria-pressed=true]{background:#fff;color:var(--pv-accent);box-shadow:0 1px 3px #355c4520;font-weight:600}
+.editor-float .layout-rules small{font-size:12px;color:var(--muted);line-height:1.6;align-self:end}
+.editor-float .layout-rules .layout-rule-note{grid-column:1/-1;margin:0}
+.editor-float .layout-rules .spacing-summary{font-size:12px;padding:8px 0;border:0;border-top:1px solid #b9d0c280;background:transparent;border-radius:0}
+.editor-float .layout-rules .checkline{font-size:12px;margin:4px 0 10px}
+.editor-float .layout-rules .checkline input{width:14px;height:14px!important;margin:0!important}
+.editor-float .layout-rules .carport-start{display:grid;grid-template-columns:1fr 1fr;align-items:center;margin-bottom:12px}
+.editor-float[data-page=layout] .run-actions button{height:32px;font-size:12px;border-radius:var(--pv-radius-xs)}
+.editor-float[data-page=layout] .run-actions .all-layout{background:#ffffff80;border:1px solid var(--pv-border-strong);color:var(--pv-accent)}
+.editor-float .layout-inspector .layout-rules>h2{display:block;margin-bottom:8px}
+
+.editor-float .layout-rules.is-carport{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.editor-float .layout-rules.is-carport>h2{grid-column:1/-1}
+.editor-float .layout-rules.is-carport .carport-start{display:flex;flex-direction:column;align-items:stretch;margin:0}
+.editor-float .layout-rules.is-carport .compact-rules{display:block;margin:0}
+
+.editor-float .module-library-entry.icon-button{width:24px;height:24px;display:flex;align-items:center;justify-content:center;padding:3px}
+.editor-float .module-library-entry .ui-icon{width:18px;height:18px;stroke-width:2}
+
+.editor-float .layout-rules .spacing-controls{padding-top:12px;border-top:1px solid #b9d0c280}
+.editor-float .layout-rules .spacing-controls .compact-rules{margin-bottom:6px}
+.editor-float .layout-rules .spacing-controls input[readonly]{background:#e7eee980;border-color:var(--pv-border-strong);color:var(--pv-text-secondary);cursor:default}
+.editor-float .layout-rules .spacing-controls small{display:block;min-height:18px}
+.editor-float .layout-rules .spacing-controls .spacing-warning{color:var(--pv-warning)}
+
+.editor-float .layout-rules .direction-control{width:100%;height:32px;box-sizing:border-box;display:flex;align-items:center;justify-content:flex-start;gap:8px;margin:0;padding:4px 8px;border:1px solid var(--pv-border-strong);border-radius:6px;background:#ffffff90;color:var(--text-secondary);font:400 12px var(--font-ui)}
+.editor-float .direction-control .ui-icon{width:18px;height:18px;flex-shrink:0;color:var(--pv-accent)}
+.editor-float .layout-rules.is-carport{display:block}
+.editor-float .layout-rules.is-carport .carport-start{width:calc(50% - 6px)}
+
+.north-compass{position:absolute;right:20px;top:64px;width:60px;height:60px;padding:0;border:0;background:transparent;filter:drop-shadow(0 3px 7px #243d4d18);cursor:pointer;z-index:3}
+.north-compass svg{width:100%;height:100%;overflow:visible}.north-compass.small{width:36px;height:36px;right:24px;top:70px}
+
+.image-overlay-panel{position:absolute;z-index:8;right:16px;top:130px;width:272px;padding:14px 16px;background:var(--pv-surface);border:1px solid var(--pv-border);border-radius:8px;box-shadow:var(--pv-shadow-popover);font:400 13px/18px var(--pv-font-sans);color:var(--pv-text-secondary);max-height:calc(100% - 150px);overflow:auto}
+.image-overlay-panel header{display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:8px}.image-overlay-panel header strong,.image-overlay-panel header h3{flex:1;margin:0}.image-overlay-panel header h3{font:600 12px/16px var(--pv-font-sans);color:var(--pv-text-secondary)}
+.image-overlay-panel .icon-button{width:28px;height:28px;padding:0;border:0;border-radius:4px;background:transparent;display:grid;place-items:center}
+.image-overlay-panel .ui-icon[data-icon]{width:16px;height:16px;color:var(--pv-text-secondary)}
+.image-overlay-panel button{font:400 13px/18px var(--pv-font-sans);border-radius:var(--pv-radius-xs)}
+.image-overlay-panel .overlay-add{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;height:30px;background:var(--pv-surface-slot);border:1px solid var(--pv-border);color:var(--pv-text);font-weight:500}.image-overlay-panel .overlay-add:hover:not(:disabled){background:var(--pv-surface-hover)}
+.overlay-list{margin:10px 0;max-height:130px;overflow:auto}
+.overlay-list>div{display:flex;align-items:center;border-radius:4px}.overlay-list>div.selected{background:var(--pv-accent-soft)}
+.overlay-list>div>button:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;background:none;border:0;padding:7px;color:inherit}
+.overlay-fields{display:flex;flex-direction:column;gap:4px;border-top:1px solid var(--pv-border);padding-top:10px}
+.overlay-fields .overlay-number-row{display:grid;grid-template-columns:minmax(0,1fr) 88px;align-items:center;gap:8px;min-height:30px;margin:0;font:400 13px/18px var(--pv-font-sans);color:var(--pv-text-secondary)}.overlay-fields .overlay-readonly-row output{text-align:right;padding-right:6px;color:var(--pv-text);font:400 13px/18px var(--pv-font-sans);font-variant-numeric:tabular-nums}
+.overlay-fields .overlay-number-row input{width:100%;min-width:0;height:24px;min-height:24px;margin:0;box-sizing:border-box;border:1px solid var(--pv-border);border-radius:4px;padding:0 6px;background:var(--pv-surface);color:var(--pv-text);font:400 13px/18px var(--pv-font-sans);font-variant-numeric:tabular-nums;text-align:right;appearance:textfield}.overlay-fields .overlay-number-row input::-webkit-inner-spin-button,.overlay-fields .overlay-number-row input::-webkit-outer-spin-button{appearance:none;margin:0}.overlay-fields .overlay-number-row input:focus{border-color:var(--pv-border-strong);outline:none}
+.overlay-fields .overlay-opacity{display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 8px;margin:0 0 4px;font:400 13px/18px var(--pv-font-sans)}.overlay-opacity output{font-size:12px;color:var(--pv-text-secondary);font-variant-numeric:tabular-nums}.overlay-opacity input{grid-column:1/-1;height:18px;margin:0;padding:0}
+.overlay-fields small{font-size:12px;color:var(--pv-text-tertiary);margin-top:4px}.overlay-delete{align-self:flex-start;border:0;background:none;color:var(--pv-danger);padding:4px 0;font-size:12px}
+.image-overlay-panel p[role=alert]{font-size:12px;color:var(--pv-danger)}
+
+/* Empty regions have no content below the menu: reserve its expansion space. */
+.editor-float .region-context-empty:has(> .region-menu[open]){padding-bottom:64px!important}
+/* Arrange: align to another area, and the pattern popover (also on object rows). */
+.region-section h2>.pattern-anchor{margin-left:auto}
+.pattern-anchor{position:relative;display:inline-flex}
+.editor-float .align-target{margin-bottom:8px}
+.editor-float .align-target select{height:30px;font-size:12px}
+.align-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.editor-float .align-grid button{height:28px;padding:0 4px;font:400 12px var(--font-ui);color:var(--pv-text-secondary);border:1px solid var(--pv-border);border-radius:var(--pv-radius-xs);background:transparent;box-shadow:none;white-space:nowrap}
+.editor-float .align-grid button:hover:not(:disabled){color:var(--pv-accent);border-color:var(--pv-accent-border);background:var(--pv-surface-subtle)}
+.align-empty{margin:0;font-size:12px;color:var(--muted)}
+.pattern-popover{position:fixed;left:0;top:0;z-index:30;width:244px;display:flex;flex-direction:column;gap:6px;padding:12px;background:var(--pv-surface,#fff);border:1px solid var(--pv-border-strong);border-radius:8px;box-shadow:var(--pv-shadow-popover);font:400 13px/18px var(--pv-font-sans);color:var(--pv-text)}
+.pattern-popover-header{display:flex;align-items:center;min-height:20px;margin-bottom:2px}
+.pattern-popover-header strong{font:600 13px/18px var(--pv-font-sans);color:var(--pv-text)}
+.pattern-axis{display:flex;gap:2px;padding:2px;border-radius:6px;background:var(--pv-surface-slot)}
+:is(.editor-float,.pattern-float) .pattern-axis .seg-btn{flex:1;height:26px;min-height:26px;border:0;border-radius:4px;font:500 12px/18px var(--pv-font-sans);color:var(--pv-text-secondary);background:transparent;box-shadow:none}
+:is(.editor-float,.pattern-float) .pattern-axis .seg-btn[aria-pressed=true]{color:var(--pv-text);background:var(--pv-surface);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.pattern-actions{display:flex;justify-content:flex-end;gap:6px;margin-top:4px}
+:is(.editor-float,.pattern-float) .pattern-actions button{height:28px;min-height:28px;padding:0 12px;font:500 12px/18px var(--pv-font-sans);color:var(--pv-text-secondary);border:1px solid var(--pv-border);border-radius:4px;background:var(--pv-surface);box-shadow:none}
+:is(.editor-float,.pattern-float) .pattern-actions button.primary{color:var(--pv-text-inverse);background:var(--pv-accent);border-color:var(--pv-accent)}
+:is(.editor-float,.pattern-float) .pattern-actions button.primary:hover{background:var(--pv-accent-hover)}
+.pattern-warning{margin:0;font-size:12px;color:var(--pv-warning,#b26a00)}
+.editor-float .object-row .object-row-copy{width:25px;height:25px;border:0;background:transparent;opacity:0;pointer-events:none;transition:opacity .12s ease}
+.editor-float .object-row:is(:hover,:focus-within) .object-row-copy,.editor-float .object-row .object-row-copy[aria-expanded=true]{opacity:1;pointer-events:auto}
+
+.image-overlay-panel .main-base-actions{display:flex;flex-wrap:wrap;gap:6px;padding-bottom:10px;margin-bottom:8px;border-bottom:1px solid var(--pv-border)}
+.image-overlay-panel .main-base-actions button{display:flex;align-items:center;gap:6px;min-height:28px;padding:0 8px}
+.image-overlay-panel .main-base-actions .ui-icon[data-icon]{width:16px!important;height:16px!important}
+.image-overlay-panel .main-base-actions>header,.image-overlay-panel .main-base-actions>.overlay-opacity{width:100%;margin:0}
+.image-overlay-panel .main-base-actions>.overlay-opacity{display:grid;grid-template-columns:1fr auto;gap:4px}

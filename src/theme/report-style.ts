@@ -1,0 +1,10 @@
+/** Shared typography and data surfaces for standalone reports and chart SVGs. */
+export const reportStyle=`
+:root{--pv-font-sans:"Inter Variable","Noto Sans SC Variable",sans-serif;--pv-text:#1c1c1f;--pv-muted:#6f7178;--pv-border:#e5e5e7;--pv-chart-primary:#5271a5;--pv-chart-secondary:#9ba9be}
+*{box-sizing:border-box}body{font:400 14px/1.65 var(--pv-font-sans);font-variant-numeric:tabular-nums;font-synthesis:none;color:var(--pv-text);max-width:1120px;margin:40px auto;padding:0 28px;background:white}
+h1{font-size:28px;line-height:1.3;font-weight:600;margin:0 0 12px}h2{font-size:17px;font-weight:600;margin:36px 0 16px;padding-top:20px;border-top:1px solid var(--pv-border)}p{margin:10px 0;color:var(--pv-muted)}small{font-size:12px;line-height:1.7;color:var(--pv-muted)}
+img{width:100%;max-height:540px;object-fit:contain}table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:10px 12px;border:0;border-bottom:1px solid var(--pv-border);text-align:right;vertical-align:top}th{font-weight:500;color:var(--pv-muted);background:#f7f7f8}td:first-child,th:first-child{text-align:left}tbody tr:hover{background:#fafafb}.report-table{overflow-x:auto;margin:16px 0 24px}table{min-width:580px}.report-chart{overflow-x:auto}.report-chart svg{min-width:1000px}svg{font-family:var(--pv-font-sans);font-variant-numeric:tabular-nums}
+button{font:500 13px var(--pv-font-sans);border:1px solid var(--pv-border);background:white;border-radius:4px;padding:8px 12px;cursor:pointer;float:right}button:hover{background:#f2f3f4}button:focus-visible{outline:2px solid #356df3;outline-offset:2px}
+@media(max-width:700px){body{margin:24px auto;padding:0 16px;font-size:16px}small{font-size:13px}h1{font-size:24px}button{float:none;margin-bottom:20px;min-height:44px}}
+@media print{button{display:none}body{margin:0;padding:0;font-size:12px}thead{display:table-header-group}tr,img,svg{break-inside:avoid}.report-table,.report-chart{overflow:visible}.report-chart svg{min-width:0}table{min-width:0;font-size:11px}td,th{padding:6px 8px}h2{break-after:avoid}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{size:A4 landscape;margin:15mm}}
+`;

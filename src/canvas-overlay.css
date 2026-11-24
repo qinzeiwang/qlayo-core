@@ -1,0 +1,26 @@
+/* Bottom-left inline legend. */
+.canvas-bottom-legend{position:absolute;left:16px;bottom:16px;z-index:5;display:flex;align-items:center;gap:14px;padding:6px 12px;border-radius:8px;background:rgba(255,255,255,0.78);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.72);font-size:11px;color:#6d7682;pointer-events:auto}
+.canvas-bottom-legend>span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.leg-dot{display:inline-block;width:7px;height:7px;border:1px solid #647488}
+.leg-panel{background:#273342}
+.leg-annex,.swatch.annex{background:var(--legend-annex-fill);border:1px solid var(--legend-annex-edge)}
+.leg-obstacle,.swatch.obstacle{background:var(--legend-obstacle-fill);border:1px solid var(--legend-obstacle-edge)}
+.leg-keepout,.swatch.keepout{background:color-mix(in srgb,var(--legend-keepout-fill) 20%,#f9fafb);border:1px solid color-mix(in srgb,var(--legend-keepout-edge) 40%,#f9fafb)}
+.canvas-legend{position:relative;pointer-events:auto;margin-left:2px;padding-left:10px;border-left:1px solid var(--pv-border)}
+.canvas-legend summary{list-style:none;cursor:pointer;color:#4e5662;font-weight:500;font-size:11px}
+.canvas-legend summary::-webkit-details-marker{display:none}
+.canvas-legend summary:hover{color:var(--pv-text)}
+.canvas-legend summary:focus-visible{outline:2px solid var(--pv-accent);outline-offset:2px}
+.canvas-legend ul{position:absolute;left:0;bottom:calc(100% + 10px);width:max-content;max-width:min(300px,calc(100vw - 32px));margin:0;padding:10px 14px;list-style:none;display:grid;gap:7px;background:#fff;border:1px solid var(--pv-border);border-radius:10px;box-shadow:var(--pv-shadow-popover)}
+.canvas-legend li{display:flex;align-items:center;gap:10px;color:var(--pv-text);font-size:12px}
+.swatch{flex:none;width:22px;height:14px;border-radius:4px;box-sizing:border-box}
+.swatch.roof{border:1.5px solid #94a3b8;background:#f8f9fa}
+.swatch.selected{border:2px solid var(--pv-accent);background:#f8f9fa}
+.swatch.ridge{height:2px;background:var(--legend-ridge)}.swatch.column{height:2px;border-radius:4px;background:var(--legend-column);opacity:.68}
+.swatch.module{background:repeating-linear-gradient(90deg,#27303f 0 4px,#64748b 4px 5px);border:1px solid #64748b}
+.swatch.shadow{background:rgba(30,41,59,0.16);border:1px solid #64748b}
+.swatch.conflict{background:var(--pv-danger);border:1px solid var(--pv-danger)}
+/* Phones: the canvas toolbar sits at the bottom, so go above it. */
+@media(max-width:700px){.canvas-bottom-legend{left:12px;bottom:72px}}
+@container workbench-viewport (max-width:540px){.canvas-bottom-legend>span{display:none}.canvas-legend{margin:0;padding:0;border:0}}
+@media(max-width:360px){.canvas-bottom-legend{bottom:104px}}

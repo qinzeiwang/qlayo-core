@@ -1,0 +1,25 @@
+/* Toolbar groups and the two labelled tools (theme rules elsewhere set sizes; these only add to them). */
+.viewport .viewport-tools>.tool-divider{flex:none;align-self:center;width:1px;height:20px;margin:0 3px;background:var(--pv-border)}
+.viewport .viewport-tools>.icon-button.labelled{width:auto;padding:0 8px;gap:5px;display:inline-flex;align-items:center;font-size:12px;white-space:nowrap}
+.viewport .viewport-tools>.icon-button.labelled svg{flex:none}
+@media(max-width:1100px){.viewport .viewport-tools>.icon-button.labelled span{display:none}.viewport .viewport-tools>.icon-button.labelled{width:28px;padding:0}}
+@media(max-width:700px){.viewport .viewport-tools>.icon-button.labelled{width:36px}.viewport .viewport-tools>.tool-divider{display:none}}
+.viewport .measure-hint{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:20;display:flex;align-items:center;gap:6px;padding:4px 4px 4px 10px;border-radius:var(--pv-radius-sm,6px);background:var(--pv-surface);border:1px solid #f0a675;box-shadow:var(--pv-shadow-float);color:#7a2e05;font-size:12px;pointer-events:none;width:max-content;max-width:calc(100% - 24px)}
+.viewport .measure-hint .icon-button{width:24px;height:24px;flex:none;color:inherit;pointer-events:auto}
+.viewport .measure-hint .ui-icon[data-icon]{width:14px!important;height:14px!important}
+@media(max-width:700px){.viewport .measure-hint{bottom:64px}}
+@container workbench-viewport (max-width:360px){.viewport .measure-hint{bottom:96px}}
+.viewport .capture-error{position:absolute;z-index:5;top:60px;left:50%;transform:translateX(-50%);max-width:calc(100% - 24px);padding:6px 12px;background:var(--pv-surface);color:var(--pv-text);border:1px solid var(--pv-border);border-radius:var(--pv-radius-sm);box-shadow:var(--pv-shadow-float);font-size:12px;pointer-events:none}
+.layout-image-anchor{display:inline-flex}
+.viewport .viewport-tools .layout-image-anchor>.icon-button{border:0;background:transparent;box-shadow:none}
+.viewport>.layout-image-menu{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+.viewport>.layout-image-menu>header{height:30px;padding:0;margin:0}
+.layout-image-menu>header .icon-button{width:30px;height:30px;display:grid;place-items:center}
+.layout-image-menu>header .ui-icon[data-icon]{width:16px;height:16px}
+.layout-image-menu .layout-image-scope>button{flex:1 1 0;min-width:0;height:24px;min-height:24px;margin:0;padding:0 4px;border-radius:4px;font:500 12px/18px var(--pv-font-sans);white-space:nowrap}
+.layout-image-options{display:grid;gap:4px}
+.layout-image-options label{display:grid;grid-template-columns:minmax(0,1fr) 16px;align-items:center;gap:8px;height:30px;margin:0;font:400 12px/18px var(--pv-font-sans)}
+.layout-image-options label:has(:disabled){color:var(--pv-text-tertiary)}
+.layout-image-options input{width:16px;height:16px;margin:0;accent-color:var(--pv-accent)}
+.layout-image-menu button.layout-image-submit{height:30px;min-height:30px;padding:0 8px;border:0;border-radius:4px;background:var(--pv-accent);color:var(--pv-text-inverse);font:600 12px/18px var(--pv-font-sans)}
+.layout-image-menu button.layout-image-submit:hover{background:var(--pv-accent-hover)}

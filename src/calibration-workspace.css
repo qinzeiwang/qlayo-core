@@ -1,0 +1,46 @@
+.calibration-workspace{
+ position:fixed;z-index:1200;inset:0;display:grid;grid-template-columns:304px minmax(0,1fr);overflow:hidden;
+ background:var(--pv-surface);color:var(--pv-text);font-family:var(--pv-font-sans)
+}
+.calibration-panel{
+ min-width:0;min-height:0;display:grid;grid-template-rows:45px minmax(0,1fr) auto;
+ border-right:1px solid var(--pv-border);background:var(--pv-surface)
+}
+.calibration-panel>header{display:flex;align-items:center;gap:6px;padding:0 12px;border-bottom:1px solid var(--pv-border)}
+.calibration-panel h1{margin:0;font:600 14px/20px var(--pv-font-sans)}
+.calibration-panel-body{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:18px;padding:14px 16px}
+.calibration-panel-body>section{display:grid;gap:7px}
+.calibration-file{display:flex;align-items:center;gap:8px;min-height:30px;color:var(--pv-text-secondary);font-size:12px}
+.calibration-file span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.calibration-section-heading{display:flex;align-items:center;justify-content:space-between;height:28px}
+.calibration-section-heading h2{margin:0;font:600 12px/18px var(--pv-font-sans)}
+.calibration-workspace .icon-button{width:30px;min-width:30px;height:30px;display:grid;place-items:center;padding:0;border:0;border-radius:4px;background:transparent;box-shadow:none;color:var(--pv-text-secondary)}
+.calibration-workspace .icon-button .ui-icon[data-icon],.calibration-file .ui-icon[data-icon],.calibration-confirm .ui-icon[data-icon]{width:16px;height:16px}
+.calibration-workspace .icon-button[aria-pressed=true]{background:var(--pv-surface-slot);color:var(--pv-text)}
+.calibration-field{display:grid;grid-template-columns:minmax(0,1fr) 110px;align-items:center;margin:0;font:400 13px/18px var(--pv-font-sans)}
+.calibration-value{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px;align-items:center;height:26px;padding:0 7px;background:var(--pv-surface-slot);border:1px solid var(--pv-border);border-radius:4px}
+.calibration-value:focus-within{border-color:var(--pv-border-strong);background:var(--pv-surface)}
+.calibration-value>span{font-size:11px;color:var(--pv-text-secondary)}
+.calibration-field input[type=number]{height:22px;padding:0;margin:0;border:0;background:transparent;text-align:right;font:400 13px/18px var(--pv-font-sans);font-variant-numeric:tabular-nums;appearance:textfield;outline:none;box-shadow:none}
+.calibration-field input::-webkit-inner-spin-button,.calibration-field input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.calibration-field input:focus-visible{outline:none;box-shadow:none}
+.calibration-north-options{padding:2px}
+.calibration-north-options .seg-btn{height:26px;min-height:26px;border-radius:4px}
+.calibration-hint,.calibration-error{margin:0;color:var(--pv-text-secondary);font:400 12px/18px var(--pv-font-sans)}
+.calibration-error{color:var(--pv-danger);margin-bottom:8px}
+.calibration-change-note{margin-bottom:8px}
+.calibration-panel footer{padding:12px 16px 16px;border-top:1px solid var(--pv-border)}
+.calibration-confirm{width:100%;height:34px;display:flex;align-items:center;justify-content:center;gap:7px;border:0;border-radius:4px;background:var(--pv-accent);color:var(--pv-text-inverse);font:600 13px/18px var(--pv-font-sans)}
+.calibration-confirm:hover:not(:disabled){background:var(--pv-accent-hover)}
+.calibration-viewport{position:relative;min-width:0;min-height:0;overflow:hidden;background-color:#f0f1f2;background-image:linear-gradient(to right,#dfe3e7 1px,transparent 1px),linear-gradient(to bottom,#dfe3e7 1px,transparent 1px);background-size:24px 24px}
+.calibration-viewport>svg{display:block;width:100%;height:100%;touch-action:none;user-select:none;cursor:crosshair}
+.calibration-viewport>svg.is-pan-mode{cursor:grab}
+.calibration-viewport>svg.is-panning{cursor:grabbing}
+.calibration-tools{position:absolute;z-index:1;top:14px;left:50%;transform:translateX(-50%);display:flex;gap:2px;padding:4px;border-radius:8px;background:var(--pv-surface);box-shadow:var(--pv-shadow-island)}
+.calibration-viewport>.north-compass.small{top:auto;right:16px;bottom:14px}
+@media(max-width:700px){
+ .calibration-workspace{grid-template-columns:minmax(0,1fr);grid-template-rows:min(45dvh,340px) minmax(0,1fr)}
+ .calibration-panel{border-right:0;border-bottom:1px solid var(--pv-border)}
+ .calibration-panel-body{padding-top:8px;padding-bottom:8px;gap:8px}
+ .calibration-panel footer{padding:8px 16px 10px}
+}
