@@ -97,13 +97,38 @@ export function PointTools({view,sites,tool,setTool,active,setActive,solve,chang
   {solve?.warnings.map(t=><p className="photo-warning" key={t}>{t}</p>)}
  </div>;
 }
+const roofCornerColor='#1478db';
+function RoofCornerDot({point,unit,active}:{point:PhotoPoint;unit:number;active:boolean}){
+ return <g pointerEvents="none">
+  {active&&<circle cx={point.x} cy={point.y} r={unit*7} fill="none" stroke={roofCornerColor} strokeWidth={1} vectorEffect="non-scaling-stroke"/>}
+  <circle cx={point.x} cy={point.y} r={unit*4} fill="white" stroke="#162b43" strokeWidth={1.5} vectorEffect="non-scaling-stroke"/>
+  <circle cx={point.x} cy={point.y} r={unit*1.5} fill={roofCornerColor}/>
+ </g>;
+}
 /** The photo with its clicked points (coloured by error, with a thin line to where the camera expects them), dashed rings where the unclicked
  * points should be, and the whole site as a wireframe. */
-export function PointPhotoOverlay({view,sites,solve,roofs,unit,active,tool,compact=false}:{view:PhotoView;sites:SitePoint[];solve?:PointSolve;roofs:RoofDesign[];unit:number;active?:string;tool:string;compact?:boolean}){
+export function PointPhotoOverlay({view,sites,solve,roofs,unit,active,tool,compact=false,roofCorners=false}:{view:PhotoView;sites:SitePoint[];solve?:PointSolve;roofs:RoofDesign[];unit:number;active?:string;tool:string;compact?:boolean;roofCorners?:boolean}){
  const camera=solve?.camera,wire=camera&&!compact?siteWire(roofs).flatMap(s=>{const q=projectSegment(camera,s.A,s.B);return q?[{...s,a:q[0],b:q[1]}]:[];}):[];
+ const corners=roofCorners?sites.map(p=>markOf(view,p.id)?.at):[];
+ const closed=corners.length===4&&corners.every(Boolean);
+ const edges=corners.flatMap((a,i)=>{
+  const b=corners[i+1]??(closed&&i===3?corners[0]:undefined);
+  return a&&b?[{a,b,i}]:[];
+ });
  return <g>
+  <g pointerEvents="none" strokeLinecap="round">
+   {edges.map(({a,b,i})=><g key={i} data-photo-roof-edge={i}>
+    <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="white" strokeWidth={4} vectorEffect="non-scaling-stroke"/>
+    <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={roofCornerColor} strokeWidth={1.6} vectorEffect="non-scaling-stroke"/>
+   </g>)}
+  </g>
   <g pointerEvents="none">{wire.map(s=><line key={s.key} x1={s.a.x} y1={s.a.y} x2={s.b.x} y2={s.b.y} stroke={s.carport?'#5ce1e6':'#ffffff'} strokeOpacity={.8} strokeWidth={unit*1.5}/>)}</g>
   {sites.map((p,i)=>{const k=markOf(view,p.id),q=compact?undefined:solve?.predicted[p.id],on=active===p.id;
+   if(k?.at&&roofCorners)return <g key={p.id}>
+    <circle data-kind="pmark" data-point={p.id} cx={k.at.x} cy={k.at.y} r={unit*10} fill="transparent" pointerEvents={tool==='pointPhoto'?'all':'none'}/>
+    <RoofCornerDot point={k.at} unit={unit} active={on}/>
+    {label(k.at,String(i+1),unit*.8)}
+   </g>;
    if(k?.at){const e=solve?.errors[p.id];return <g key={p.id}>{q&&<line pointerEvents="none" x1={k.at.x} y1={k.at.y} x2={q.x} y2={q.y} stroke="#ff4f5e" strokeWidth={unit*1.5}/>}
     {on&&<circle pointerEvents="none" cx={k.at.x} cy={k.at.y} r={unit*13} fill="none" stroke="#ffe066" strokeWidth={unit*2.5}/>}
     <circle data-kind="pmark" data-point={p.id} cx={k.at.x} cy={k.at.y} r={unit*7} fill={errorColor(e)} stroke="#102030" strokeWidth={unit*1.5} style={tool==='pointPhoto'?undefined:{pointerEvents:'none'}}/>{label(k.at,String(i+1),unit)}</g>;}
@@ -112,11 +137,14 @@ export function PointPhotoOverlay({view,sites,solve,roofs,unit,active,tool,compa
  </g>;
 }
 /** Model corners and posts (small dots) and the picked site points (numbered) over the plan. */
-export function PointPlanOverlay({sites,targets,unit,active,hover,numbered=true}:{sites:SitePoint[];targets:SnapTarget[];unit:number;active?:string;hover?:{x:number;z:number};numbered?:boolean}){
+export function PointPlanOverlay({sites,targets,unit,active,hover,numbered=true,roofCorners=false}:{sites:SitePoint[];targets:SnapTarget[];unit:number;active?:string;hover?:{x:number;z:number};numbered?:boolean;roofCorners?:boolean}){
  const dot={roof:'#2484b5',panel:'#1c9aa0',post:'#334250'};
  return <g>
   <g pointerEvents="none">{targets.map((t,i)=>t.mid?<circle key={i} cx={t.x} cy={t.z} r={unit*2.5} fill="white" stroke={dot[t.kind]} strokeWidth={unit}/>:<circle key={i} cx={t.x} cy={t.z} r={unit*(t.kind==='post'?2.5:3)} fill={dot[t.kind]}/>)}</g>
-  {sites.map((p,i)=><g key={p.id}>{active===p.id&&<circle pointerEvents="none" cx={p.x} cy={p.z} r={unit*13} fill="none" stroke="#307c77" strokeWidth={unit*2.5}/>}
+  {sites.map((p,i)=>roofCorners?<g key={p.id}>
+   <RoofCornerDot point={{x:p.x,y:p.z}} unit={unit} active={active===p.id}/>
+   {numbered&&label({x:p.x,y:p.z},String(i+1),unit*.8)}
+  </g>:<g key={p.id}>{active===p.id&&<circle pointerEvents="none" cx={p.x} cy={p.z} r={unit*13} fill="none" stroke="#307c77" strokeWidth={unit*2.5}/>}
    <circle data-kind="site" data-point={p.id} cx={p.x} cy={p.z} r={unit*7} fill="#307c77" stroke="white" strokeWidth={unit*1.5}/>{numbered&&label({x:p.x,y:p.z},String(i+1),unit)}</g>)}
   {hover&&<circle pointerEvents="none" cx={hover.x} cy={hover.z} r={unit*9} fill="none" stroke="#307c77" strokeWidth={unit*2}/>}
  </g>;

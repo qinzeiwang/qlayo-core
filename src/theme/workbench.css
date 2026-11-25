@@ -687,7 +687,7 @@ input[type=checkbox],input[type=radio],input[type=range]{accent-color:var(--pv-a
  .icon-rail .rail-save-action{margin-bottom:0;margin-right:8px}
  .icon-rail .rail-save-wrap .save-notice{left:auto;right:10px;bottom:auto;top:58px;max-width:calc(100vw - 20px)}
  .icon-rail .project-menu>div{left:auto;right:0;top:calc(100% + 8px);bottom:auto}
- .workspace-forma .editor-float.sidebar-drawer{position:absolute;left:10px;top:58px;bottom:auto;width:min(320px,calc(100vw - 20px));height:auto;max-height:calc(100% - 120px);border-radius:12px;box-shadow:var(--pv-shadow-popover);border:1px solid var(--pv-border)}
+ .workspace-forma .editor-float.sidebar-drawer{position:absolute;left:10px;top:106px;bottom:auto;z-index:25;width:min(320px,calc(100vw - 20px));height:auto;max-height:calc(100% - 176px);border-radius:12px;box-shadow:var(--pv-shadow-popover);border:1px solid var(--pv-border)}
  .workspace-forma .editor-float.sidebar-drawer.is-collapsed{width:0!important}
  .workspace-forma .viewport .viewport-tools.canvas-island{top:auto;bottom:12px;left:50%;transform:translateX(-50%)}
  .top-right-cluster{top:10px;right:10px}

@@ -46,7 +46,7 @@ export function TopBar(p:Props){
     <button className={`rail-btn rail-tab rail-utility icon-button${p.saveNotice?.error?' is-error':''}`} disabled={saving||importing} aria-label={saving?tx('保存中…'):tx('保存项目')} aria-busy={saving} data-tooltip={saving?tx('保存中…'):`${tx('保存项目')} · Ctrl+S`} onClick={p.onSave}>
      <Icon name="save"/><small>{tx('保存')}</small>
     </button>
-    {p.saveNotice?.error&&<p key={p.saveNotice.id} className={`save-notice${p.saveNotice.error?' is-error':''}`} role={p.saveNotice.error?'alert':'status'}><Icon name={p.saveNotice.error?'alert':'check'}/><span>{p.saveNotice.text}</span>{p.saveNotice.error&&<button className="icon-button" aria-label={tx('关闭')} title={tx('关闭')} onClick={p.onDismissSaveNotice}><Icon name="close"/></button>}</p>}
+    {p.saveNotice&&<p key={p.saveNotice.id} className={`save-notice${p.saveNotice.error?' is-error':''}`} role={p.saveNotice.error?'alert':'status'}><Icon name={p.saveNotice.error?'alert':'check'}/><span>{p.saveNotice.text}</span>{p.saveNotice.error&&<button className="icon-button" aria-label={tx('关闭')} title={tx('关闭')} onClick={p.onDismissSaveNotice}><Icon name="close"/></button>}</p>}
    </div>}
    {!p.viewOnly&&<button className="rail-btn rail-tab rail-utility icon-button" aria-label={tx('全局设置')} title={tx('全局设置')} onClick={p.onSettings}><Icon name="settings"/><small>{tx('设置')}</small></button>}
    <details className="project-menu">

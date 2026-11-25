@@ -11,7 +11,6 @@ import {parseCanvasId,targetRoofId} from './canvas-target';
 import {blankDocument,documentFromWorkspace,useProjectDocument,workspaceFromDocument} from './project-document';
 import type {ProjectExtras} from './project-extras';
 import {workbenchAddons,type AddonContext} from './workbench-addons';
-import './capacity-report';
 import './photo-tool';
 import {currentProjectId,listRecent,newProjectId,readRecent,removeRecent,resolveProjectName,saveRecent,setCurrentProjectId,type RecentProject} from './recent-projects';
 import {activeRoofIssues,worldIssues,worldPanelShadowZones,winterCheckLines} from './roof-shadows';
@@ -776,6 +775,10 @@ function App() {
 
 
           {autosaveError&&<p className="autosave-error" role="alert" title={autosaveError}><Icon name="alert"/>{tx('未能自动保存：')}{autosaveError}</p>}
+          {viewOnly&&!collapsed&&<header className="region-context-header">
+            <button type="button" className="icon-button header-back" title={tx('收起面板')} aria-label={tx('收起面板')} onClick={()=>setCollapsed(true)}><Icon name="chevron-left"/></button>
+            <span className="region-title">{tx('报告')}</span>
+          </header>}
           {viewOnly&&!collapsed&&<p className="view-only-note" role="note">{tx('仅查看 · 编辑请使用电脑或平板')}</p>}
           {!viewOnly&&!inlineDrawing&&<><LocationMismatchNotice value={sunSettings} address={projectAddress} onSettings={()=>setSettingsTab('project')}/></>}
           {areaDrawing?<header className="region-context-header drawing-context-header"><span className="region-title">{drawingIntent==='reshape'?tx('编辑区域'):drawingDraft?.carport?tx('新建车棚'):tx('新建屋面')}</span></header>:!viewOnly&&!collapsed&&<RegionBar layoutAction={{run:()=>runLayout(layoutOptions),disabled:stress||running||needsOutline||!hasSelection||!activeSelected,stale:layoutStale&&(arrays.length>0||!!active.previous?.length),runAll:roofs.length>1&&hasSelection?runAll:undefined,allDisabled:stress||running}} locked={objectDrawing||layoutAreaOpen} roofs={roofs} active={active} hasSelection={hasSelection&&activeSelected} panel={panel} creating={creating} importing={importing} running={running} canReshape={!!baseImage} canUndoDelete={!!deletedRoof}
@@ -786,6 +789,14 @@ function App() {
 
 
           <div ref={inspector} className="inspector-content" hidden={collapsed}>
+          {viewOnly&&<section className="report-workflow">
+            <div className="deliver-overview">
+              <div className="deliver-hero" aria-label={tx('装机量')}><strong>{total.capacity.toFixed(1)}</strong><span>kWp</span></div>
+              <div className="deliver-sub">{hasSelection?roofs.length:0} {tx('个区域')} · {tx('{0} 块',total.count)}</div>
+            </div>
+            {hasSelection&&(pending.length?<div className="report-readiness pending"><Icon name="info"/><span title={pending.join('、')}>{tx('{0} 个区域待更新，请先更新布置',pending.length)}</span></div>:<div className="report-readiness ready"><Icon name="check"/><span>{tx('布置已准备')}</span></div>)}
+            <button type="button" className="primary-action report-primary" disabled={stress||running||!hasSelection} onClick={()=>setLayoutReportOpen(true)}>{tx('预览报告')}</button>
+          </section>}
 
 
 
@@ -909,10 +920,12 @@ function App() {
                 onProgress: setProgress,
                 onReport: (result) => {
                   setReport(result);
-                  localStorage.setItem(
-                    "pv.visual.performance",
-                    JSON.stringify(result),
-                  );
+                  try {
+                    localStorage.setItem(
+                      "pv.visual.performance",
+                      JSON.stringify(result),
+                    );
+                  } catch {/* Browser storage may be unavailable. */}
                 },
               }}
               onEditObject={id=>{if(!viewOnly&&mode==='top')editCanvasObject(resolvePreviewHit(id)??id);}}

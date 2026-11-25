@@ -42,6 +42,8 @@ function spreadVertices<T extends {x:number;z:number}>(vertices:T[]){
 }
 export function PhotoMatchPanel({roofs,site,initialId,base,overlays,items,sitePoints,onApply,onClose,sunSettings,onSave}:Props){
  const [all,setAll]=useState(()=>structuredClone(items)),[id,setId]=useState(()=>roofs.some(r=>r.id===initialId)?initialId:roofs[0]?.id),[viewId,setViewId]=useState(''),[tool,setTool]=useState<'corners'|'height'|'pan'|'mask'|LineTool|PointTool>('corners'),[sites,setSites]=useState(()=>structuredClone(sitePoints)),[active,setActive]=useState<string>(),[dragging,setDragging]=useState(false),[pending,setPending]=useState<PhotoPoint>(),[error,setError]=useState(''),[busy,setBusy]=useState(false),[zoom,setZoom]=useState(1),[offset,setOffset]=useState({x:0,y:0});
+ const lastTool=useRef<Exclude<typeof tool,'pan'>>('corners');
+ if(tool!=='pan')lastTool.current=tool;
  const [referenceMode,setReferenceMode]=useState<'corners'|'custom'>('corners');
  const [markingView,setMarkingView]=useState<string>();
  const [confirmed,setConfirmed]=useState<string>();
@@ -62,7 +64,7 @@ export function PhotoMatchPanel({roofs,site,initialId,base,overlays,items,sitePo
  const [undo,setUndo]=useState<{views:PhotoView[];sites:SitePoint[]}[]>([]),[guide,setGuide]=useState<number|null>(null),[planHover,setPlanHover]=useState<{x:number;z:number}>();
  const file=useRef<HTMLInputElement>(null),alive=useRef(true),opened=useRef({all,sites}),lastCamera=useRef<PhotoCamera>(undefined);
  useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
- const drag=useRef<{kind:'corner'|'height'|'pan'|'mask'|'line'|'ref'|'plan'|'site'|'pmark';index:number;point?:string;end?:'a'|'b';mask?:number;start:PhotoPoint;offset:PhotoPoint}|null>(null);
+ const drag=useRef<{kind:'corner'|'height'|'pan'|'mask'|'line'|'ref'|'plan'|'site'|'pmark';index:number;point?:string;end?:'a'|'b';mask?:number;start:PhotoPoint;offset:PhotoPoint;panClient?:PhotoPoint;panOrigin?:PhotoPoint;panScale?:PhotoPoint}|null>(null);
  // A roof can have several photos; the strip picks one. `m` adds the classic corner and height form to the selected view.
  const r=roofs.find(r=>r.id===id)??roofs[0],own=all.filter(v=>v.roofId===id),savedView=own.find(v=>v.id===viewId)??own[0];
  const legacyInCore=coreEdition&&!!savedView&&savedView.method!=='points';
@@ -82,7 +84,9 @@ export function PhotoMatchPanel({roofs,site,initialId,base,overlays,items,sitePo
  const selectedIds=referenceMode==='corners'&&!r.carport?defaultPointIds:(view?.referencePointIds??markIds);
  const visibleSites=coreEdition?selectedIds.flatMap(id=>sites.filter(point=>point.id===id)):sites;
  const selectingCustom=coreEdition&&customDraft!==null;
- const planMode=coreEdition?selectingCustom:lines&&tool==='plan'||points&&tool==='pointPlan';
+ const fourRoofCorners=coreEdition&&!r.carport&&referenceMode==='corners'&&visibleSites.length===4;
+ const paneTool=tool==='pan'?lastTool.current:tool;
+ const planMode=coreEdition?selectingCustom:lines&&paneTool==='plan'||points&&paneTool==='pointPlan';
  useEffect(()=>setPending(undefined),[tool,view?.id]);
  const firstTool=(v?:PhotoView)=>v&&(coreEdition||v.method==='points')?(sites.length>=4?'pointPhoto':'pointPlan'):v?.method==='lines'?'reference':'corners';
  // An opened view starts on the first tool of its own method.
@@ -102,8 +106,14 @@ export function PhotoMatchPanel({roofs,site,initialId,base,overlays,items,sitePo
  const update=(patch:Partial<PhotoEdit>)=>setAll(v=>v.map(x=>x.id===view?.id?applyEdit(x,{...editOf(x),...patch}):x));
  const updateView=(patch:Partial<PhotoView>)=>setAll(v=>v.map(x=>x.id===view?.id?{...x,...(coreEdition?{method:'points' as const}:{}),...patch}:x));
  const paneKey=planMode?'plan':'photo';
- const changeZoom=(scale:(zoom:number)=>number,key:keyof typeof views=paneKey)=>coreEdition
-  ?setViews(v=>({...v,[key]:{...v[key],zoom:scale(v[key].zoom)}})):setZoom(scale);
+ const zoomBounds=(pane:keyof typeof views)=>pane==='plan'?{min:.25,max:40}:{min:1,max:12};
+ const changeZoom=(factor:number,key:keyof typeof views=paneKey)=>{
+  const {min,max}=zoomBounds(key);
+  const scale=(value:number)=>Math.max(min,Math.min(max,value*factor));
+  if(coreEdition)setViews(v=>({...v,[key]:{...v[key],zoom:scale(v[key].zoom)}}));
+  else setZoom(scale);
+ };
+ const activeZoom=coreEdition?views[paneKey].zoom:zoom;
  const fit=()=>{setZoom(1);setOffset({x:0,y:0});setViews({plan:{zoom:1,x:0,y:0},photo:{zoom:1,x:0,y:0}});};
  // Closing keeps the work in the project (undo can take it back); only saving writes the file.
  const close=()=>{alive.current=false;if(all!==opened.current.all||sites!==opened.current.sites)try{onApply(parsePhotoViews(all,sites),sites)}catch{/* An unfinished view is dropped. */}onClose();};
@@ -123,7 +133,14 @@ export function PhotoMatchPanel({roofs,site,initialId,base,overlays,items,sitePo
  const box=!m?{x:0,y:0,w:1,h:1}:planMode?planBounds:photoBounds,vb={x:box.x+(box.w-box.w/zoom)/2+offset.x,y:box.y+(box.h-box.h/zoom)/2+offset.y,w:box.w/zoom,h:box.h/zoom};
  useEffect(()=>{if(!coreEdition){setZoom(1);setOffset({x:0,y:0});}},[planMode]);
  function point(e:React.PointerEvent<SVGSVGElement>){const matrix=e.currentTarget.getScreenCTM();if(!matrix)return {x:0,y:0};const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(matrix.inverse());return {x:p.x,y:p.y};}
- function down(e:React.PointerEvent<SVGSVGElement>,isPlan:boolean,canvasUnit:number){if(!m||(e.button!==0&&e.button!==1)||isPlan&&points&&(drawingMask||tool==='mask'))return;const p=point(e);if(e.button===1){e.preventDefault();drag.current={kind:'pan',index:0,start:p,offset};e.currentTarget.setPointerCapture(e.pointerId);return;}const target=e.target as SVGElement;const kind=target.dataset.kind as 'corner'|'height'|'mask'|undefined;const index=Number(target.dataset.index??0);if(drawingMask){if(p.x>=0&&p.y>=0&&p.x<=m.width&&p.y<=m.height&&maskDraft.length<200)setMaskDraft(v=>[...v,p]);return;}if(isPlan&&customDraft&&tool!=='pan'){
+ function startPan(e:React.PointerEvent<SVGSVGElement>,isPlan:boolean,p:PhotoPoint){
+  const matrix=e.currentTarget.getScreenCTM();
+  const sx=matrix?1/Math.hypot(matrix.a,matrix.b):1,sy=matrix?1/Math.hypot(matrix.c,matrix.d):1;
+  const origin=coreEdition?{x:views[isPlan?'plan':'photo'].x,y:views[isPlan?'plan':'photo'].y}:{x:offset.x,y:offset.y};
+  drag.current={kind:'pan',index:0,start:p,offset,panClient:{x:e.clientX,y:e.clientY},panOrigin:origin,panScale:{x:sx,y:sy}};
+  e.currentTarget.setPointerCapture(e.pointerId);
+ }
+ function down(e:React.PointerEvent<SVGSVGElement>,isPlan:boolean,canvasUnit:number){if(!m||(e.button!==0&&e.button!==1)||isPlan&&points&&(drawingMask||tool==='mask'))return;const p=point(e);if(e.button===1){e.preventDefault();startPan(e,isPlan,p);return;}const target=e.target as SVGElement;const kind=target.dataset.kind as 'corner'|'height'|'mask'|undefined;const index=Number(target.dataset.index??0);if(drawingMask){if(p.x>=0&&p.y>=0&&p.x<=m.width&&p.y<=m.height&&maskDraft.length<200)setMaskDraft(v=>[...v,p]);return;}if(isPlan&&customDraft&&tool!=='pan'){
   const target=nearestTarget({x:p.x,z:p.y},targets,canvasUnit*14);
   const q=target??{x:p.x,z:p.y},h=defaultHeight(target);
   const selected=customDraft.find(point=>Math.hypot(point.x-q.x,point.z-q.z)<.05);
@@ -135,7 +152,7 @@ export function PhotoMatchPanel({roofs,site,initialId,base,overlays,items,sitePo
  }if(points&&view&&!drawingMask&&isPointTool(tool)){
   if(coreEdition&&!marking)return;
   pointDown(e,p,target,isPlan,canvasUnit);return;
- }if(lines&&view&&isLineTool(tool)){lineDown(e,p,target,canvasUnit);return;}const activeKind=kind==='corner'?tool==='corners':kind==='height'?tool==='height':kind==='mask'?tool==='mask':false;if(activeKind||tool==='pan'){checkpoint();drag.current={kind:tool==='pan'?'pan':kind!,index,mask:Number(target.dataset.mask??0),start:p,offset};e.currentTarget.setPointerCapture(e.pointerId);return;}
+ }if(lines&&view&&isLineTool(tool)){lineDown(e,p,target,canvasUnit);return;}const activeKind=kind==='corner'?tool==='corners':kind==='height'?tool==='height':kind==='mask'?tool==='mask':false;if(tool==='pan'){startPan(e,isPlan,p);return;}if(activeKind){checkpoint();drag.current={kind:kind!,index,mask:Number(target.dataset.mask??0),start:p,offset};e.currentTarget.setPointerCapture(e.pointerId);return;}
  if(p.x<0||p.y<0||p.x>m.width||p.y>m.height)return;
  checkpoint();if(tool==='corners'){if(m.corners.length<4)update({corners:[...m.corners,p],heightPoints:[]});}else if(tool==='height'&&heightEnabled){if(m.heightMode==='below'){const a=m.corners[m.anchor];if(a)update({heightPoints:[a,p]});}else if(m.heightPoints.length<2)update({heightPoints:[...m.heightPoints,p]});}}
  // Point tools: on the plan a click picks a model corner or post (or selects a picked one); in the photo it places the selected point, then moves on.
@@ -172,12 +189,12 @@ export function PhotoMatchPanel({roofs,site,initialId,base,overlays,items,sitePo
   if(Math.hypot(p.x-pending.x,p.y-pending.y)<3)return;
   checkpoint();updateView({lines:[...(v.lines??[]),{id:newId(),kind:tool as 'vertical'|'along'|'across'|'measure',a:pending,b:p}]});setPending(undefined);
  }
- function move(e:React.PointerEvent<SVGSVGElement>,isPlan:boolean,canvasUnit:number){const d=drag.current;if(isPlan&&d?.kind!=='pan'){const p=point(e),q=points?nearestTarget({x:p.x,z:p.y},targets,canvasUnit*14)??{x:p.x,z:p.y}:snapPlan({x:p.x,z:p.y},site,canvasUnit*10);setPlanHover(q.x!==p.x||q.z!==p.y?q:undefined);}if(!d||!m)return;const p=point(e);if(d.kind==='pan'){
-  const moveBy={x:d.start.x-p.x,y:d.start.y-p.y};
-  if(coreEdition){const key=isPlan?'plan':'photo';setViews(v=>({...v,[key]:{...v[key],x:v[key].x+moveBy.x,y:v[key].y+moveBy.y}}));}
-  else setOffset(o=>({x:o.x+moveBy.x,y:o.y+moveBy.y}));
+ function move(e:React.PointerEvent<SVGSVGElement>,isPlan:boolean,canvasUnit:number){const d=drag.current;if(isPlan&&d?.kind!=='pan'){const p=point(e),q=points?nearestTarget({x:p.x,z:p.y},targets,canvasUnit*14)??{x:p.x,z:p.y}:snapPlan({x:p.x,z:p.y},site,canvasUnit*10);setPlanHover(q.x!==p.x||q.z!==p.y?q:undefined);}if(!d||!m)return;if(d.kind==='pan'&&d.panClient&&d.panOrigin&&d.panScale){
+  const next={x:d.panOrigin.x-(e.clientX-d.panClient.x)*d.panScale.x,y:d.panOrigin.y-(e.clientY-d.panClient.y)*d.panScale.y};
+  if(coreEdition){const key=isPlan?'plan':'photo';setViews(v=>({...v,[key]:{...v[key],...next}}));}
+  else setOffset(next);
   return;
- }const q={x:Math.max(0,Math.min(m.width,p.x)),y:Math.max(0,Math.min(m.height,p.y))};
+ }const p=point(e);const q={x:Math.max(0,Math.min(m.width,p.x)),y:Math.max(0,Math.min(m.height,p.y))};
  if(d.kind==='site'){const t=nearestTarget({x:p.x,z:p.y},targets,canvasUnit*14);setSites(list=>list.map(s=>s.id!==d.point?s:{...s,x:t?.x??p.x,z:t?.z??p.y,h:s.h===0||!t?s.h:t.top}));return;}
  if(d.kind==='pmark'){updateView({marks:m.marks.map(k=>k.anchor.kind==='site'&&k.anchor.pointId===d.point?{...k,at:q}:k)});return;}
  if(d.kind==='plan'){updateView({reference:{...m.reference,[d.end==='a'?'planA':'planB']:snapPlan({x:p.x,z:p.y},site,canvasUnit*10)}});return;}
@@ -187,7 +204,7 @@ export function PhotoMatchPanel({roofs,site,initialId,base,overlays,items,sitePo
  const refPoints=corners(roofRect(r));const reference=base?.metersPerPixel?refPoints.map(p=>{const q=worldToImage(p,base);return {x:q.x,y:q.z};}):[{x:0,y:0},{x:r.roof.width,y:0},{x:r.roof.width,y:r.roof.depth},{x:0,y:r.roof.depth}];
  const xs=reference.map(p=>p.x),ys=reference.map(p=>p.y),rw=Math.max(...xs)-Math.min(...xs),rh=Math.max(...ys)-Math.min(...ys),pad=Math.max(rw,rh)*.15;
  const problem=m&&!points&&!lines&&!legacyPolygon?cornerProblem(m.corners):'';
- function finishMask(){if(!m||maskDraft.length<3)return;checkpoint();updateView({occlusions:[...(m.occlusions??[]),maskDraft]});setSelectedMask((m.occlusions??[]).length);setMaskDraft([]);setDrawingMask(false);}
+ function finishMask(){if(!m||maskDraft.length<3)return;checkpoint();updateView({occlusions:[...(m.occlusions??[]),maskDraft]});if(coreEdition&&marking){setSelectedMask(null);setTool('pointPhoto');}else setSelectedMask((m.occlusions??[]).length);setMaskDraft([]);setDrawingMask(false);}
  function useRoofCorners(switchMethod=false){
   const vertices=roofCornerTargets(r);
   const selected=coreEdition&&vertices.length>4?spreadVertices(vertices):vertices;
@@ -255,6 +272,18 @@ export function PhotoMatchPanel({roofs,site,initialId,base,overlays,items,sitePo
    <input type="range" min={min} max={max} step={step} value={Math.round(value*100)} style={{'--photo-slider-progress':`${(value*100-min)/(max-min)*100}%`} as CSSProperties} disabled={disabled} aria-label={label} onChange={e=>change(Number(e.target.value)/100)}/>
   </label>;
  const currentColor=options.panelColor??(options.panelFinish==='charcoal'?'black':options.panelFinish==='blue-grey'?'grayBlue':'blueBlack');
+ const changeSunDate=(nextDate:string)=>{
+  const next={...sun,date:nextDate};
+  if(!validSunSettings(next))return;
+  const nextDaylight=daylightMinutes(next);
+  if(nextDaylight.length)next.time=timeLabel(nextDaylight[nearestDaylight(nextDaylight,sun.time)]);
+  changeOptions({sun:next});
+ };
+ const togglePan=()=>setTool(current=>{
+  if(current!=='pan')return 'pan';
+  if(coreEdition)return selectingCustom?'pointPlan':selectedMask!==null?'mask':'pointPhoto';
+  return lastTool.current;
+ });
  const settings=<div className="photo-render-settings" inert={busy}>
   <section className="photo-render-group">
    <h3>{tx('组件外观')}</h3>
@@ -271,7 +300,7 @@ export function PhotoMatchPanel({roofs,site,initialId,base,overlays,items,sitePo
   <section className="photo-render-group">
    <h3>{tx('光照与阴影')}</h3>
    {adjustment(tx('阴影强度'),options.shadowStrength??defaultPhotoShadowStrength,0,100,1,v=>changeOptions({shadowStrength:v}),!shadowAvailable)}
-  <label>{tx('天气')}<select value={options.weather} onChange={e=>changeOptions({weather:e.target.value as PhotoRenderOptions['weather']})}><option value="sunny">{tx('晴天')}</option><option value="overcast">{tx('阴天')}</option></select></label><label>{tx('日期')}<input data-1p-ignore type="date" value={sun.date} onInput={e=>changeOptions({sun:{...sun,date:e.currentTarget.value}})}/></label>
+  <label>{tx('天气')}<select value={options.weather} onChange={e=>changeOptions({weather:e.target.value as PhotoRenderOptions['weather']})}><option value="sunny">{tx('晴天')}</option><option value="overcast">{tx('阴天')}</option></select></label><label>{tx('日期')}<input data-1p-ignore type="date" min="1900-01-01" max="2100-12-31" value={sun.date} onChange={e=>changeSunDate(e.currentTarget.value)}/></label>
    <label className="photo-appearance-slider photo-time-slider"><span>{tx('当地时间')}</span><output>{sun.time}</output>
     <input type="range" aria-label={tx('光照时间')} aria-valuetext={sun.time} min={0} max={Math.max(0,lastDaylight)} value={daylightIndex}
      style={{'--photo-slider-progress':(lastDaylight>0?daylightIndex/lastDaylight*100:0)+"%"} as CSSProperties}
@@ -294,9 +323,9 @@ export function PhotoMatchPanel({roofs,site,initialId,base,overlays,items,sitePo
   const frame=views[pane];
   const canvasBox=coreEdition?{x:bounds.x+(bounds.w-bounds.w/frame.zoom)/2+frame.x,y:bounds.y+(bounds.h-bounds.h/frame.zoom)/2+frame.y,w:bounds.w/frame.zoom,h:bounds.h/frame.zoom}:isPlan===planMode?vb:bounds;
   const unit=Math.max(canvasBox.w/900,canvasBox.h/650);
-  return <svg className="photo-canvas" aria-label={isPlan?tx('平面图中的点位'):tx('实景照片标注画布')} viewBox={`${canvasBox.x} ${canvasBox.y} ${canvasBox.w} ${canvasBox.h}`} onAuxClick={e=>e.preventDefault()} onPointerDown={e=>down(e,isPlan,unit)} onPointerMove={e=>move(e,isPlan,unit)} onPointerUp={()=>{drag.current=null;setDragging(false);}} onPointerCancel={()=>{drag.current=null;setDragging(false);}} onPointerLeave={()=>setPlanHover(undefined)} onWheel={e=>{if(coreEdition||isPlan===planMode)changeZoom(z=>Math.max(1,Math.min(isPlan?40:12,z*(e.deltaY<0?1.15:1/1.15))),pane);}}>
- {isPlan?<><PlanOverlay transparent={coreEdition} roofs={site} base={base} overlays={overlays} view={view!} solve={solve} unit={unit} hover={points?undefined:planHover}/>{points&&<PointPlanOverlay sites={customDraft??visibleSites} numbered={!selectingCustom} targets={targets} unit={unit} active={active} hover={planHover}/>}</>:<>
- <image href={m.url} width={m.width} height={m.height}/>{lines&&<PhotoLineOverlay view={view!} tool={tool} unit={unit} solve={solve} roofs={site} pending={pending}/>}{points&&<PointPhotoOverlay compact={coreEdition} view={view!} sites={visibleSites} solve={pointSolve} roofs={site} unit={unit} active={active} tool={tool}/>}{!points&&!lines&&!legacyPolygon&&<polygon points={m.corners.map(p=>`${p.x},${p.y}`).join(' ')} fill="none" stroke="#43bdff" strokeWidth={unit*2}/>}
+  return <svg className="photo-canvas" aria-label={isPlan?tx('平面图中的点位'):tx('实景照片标注画布')} viewBox={`${canvasBox.x} ${canvasBox.y} ${canvasBox.w} ${canvasBox.h}`} onAuxClick={e=>e.preventDefault()} onPointerDown={e=>down(e,isPlan,unit)} onPointerMove={e=>move(e,isPlan,unit)} onPointerUp={()=>{drag.current=null;setDragging(false);}} onPointerCancel={()=>{drag.current=null;setDragging(false);}} onPointerLeave={()=>setPlanHover(undefined)} onWheel={e=>{if(coreEdition||isPlan===planMode)changeZoom(e.deltaY<0?1.15:1/1.15,pane);}}>
+ {isPlan?<><PlanOverlay transparent={coreEdition} roofs={site} base={base} overlays={overlays} view={lines?view:undefined} solve={lines?solve:undefined} unit={unit} hover={points?undefined:planHover}/>{points&&<PointPlanOverlay sites={customDraft??visibleSites} numbered={!selectingCustom} targets={targets} unit={unit} active={active} hover={planHover}/>}</>:<>
+ <image href={m.url} width={m.width} height={m.height}/>{lines&&<PhotoLineOverlay view={view!} tool={tool} unit={unit} solve={solve} roofs={site} pending={pending}/>}{points&&<PointPhotoOverlay compact={coreEdition} roofCorners={fourRoofCorners} view={view!} sites={visibleSites} solve={pointSolve} roofs={site} unit={unit} active={active} tool={tool}/>}{!points&&!lines&&!legacyPolygon&&<polygon points={m.corners.map(p=>`${p.x},${p.y}`).join(' ')} fill="none" stroke="#43bdff" strokeWidth={unit*2}/>}
  {(m.occlusions??[]).map((polygon,i)=><g key={`mask-${i}`}><polygon points={polygon.map(p=>`${p.x},${p.y}`).join(' ')} fill="#efaa4422" stroke="#efaa44" strokeWidth={unit*2} pointerEvents={tool==='mask'&&!drawingMask?'auto':'none'} onPointerDown={e=>{if(e.button!==0||drawingMask||tool!=='mask')return;e.stopPropagation();setSelectedMask(i);}}/>{selectedMask===i&&tool==='mask'&&!drawingMask&&polygon.map((p,j)=><circle key={j} data-kind="mask" data-mask={i} data-index={j} cx={p.x} cy={p.y} r={unit*7} fill="#9e610d" stroke="white" strokeWidth={unit*2}/>)}</g>)}
  {drawingMask&&<g pointerEvents="none"><polyline points={maskDraft.map(p=>`${p.x},${p.y}`).join(' ')} fill="none" stroke="#efaa44" strokeWidth={unit*2}/>{maskDraft.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={unit*5} fill="#efaa44"/>)}</g>}
  {heightEnabled&&<polyline points={m.heightPoints.map(p=>`${p.x},${p.y}`).join(' ')} fill="none" stroke="#ffc35a" strokeWidth={unit*2}/> }
@@ -367,7 +396,7 @@ export function PhotoMatchPanel({roofs,site,initialId,base,overlays,items,sitePo
  {legacyPolygon&&<small role="status">{tx('多段线屋面请使用点位对应。')}</small>}
  {coreEdition&&!selectingCustom&&<svg className="photo-plan-thumbnail" viewBox={`${left} ${top} ${thumbWidth} ${thumbHeight}`} aria-label={tx('平面图中的点位')}>
   <PlanOverlay roofs={[r]} base={base} overlays={overlays} unit={planBounds.w/180}/>
-  <PointPlanOverlay sites={visibleSites} targets={[]} unit={Math.max(thumbWidth/210,thumbHeight/136)} active={marking?next?.id:undefined}/>
+  <PointPlanOverlay sites={visibleSites} roofCorners={fourRoofCorners} targets={[]} unit={Math.max(thumbWidth/210,thumbHeight/136)} active={marking?next?.id:undefined}/>
  </svg>}
  {points&&<><div className="photo-pair-actions seg-track" role="group" aria-label={tx('参考点选择')}><button className="seg-btn" type="button" disabled={drawingMask||selectingCustom||!!r.carport} aria-pressed={coreEdition&&referenceMode==='corners'&&!r.carport&&!selectingCustom} onClick={()=>{if(coreEdition)setReferenceMode('corners');useRoofCorners(coreEdition);}}>{tx('屋面角点')}</button><button className="seg-btn" type="button" disabled={drawingMask||selectingCustom} aria-pressed={coreEdition&&(selectingCustom||referenceMode==='custom'||!!r.carport)} onClick={()=>{if(coreEdition)startCustom();else setTool('pointPlan');}}>{tx('自定义点')}</button></div>{!coreEdition&&pointTools}</>}
  {lines&&<LineTools view={view!} tool={tool} setTool={setTool} solve={solve} northAngle={northAngle} change={patch=>{checkpoint();updateView(patch);}} openGuide={setGuide}/>}
@@ -381,8 +410,8 @@ export function PhotoMatchPanel({roofs,site,initialId,base,overlays,items,sitePo
  <small>{m.heightMode==='below'?tx('墙脚必须位于所选屋角正下方。'):tx('设备底点必须位于所选屋面平面上。')}</small></>}</>}
  {!selectingCustom&&<section className="photo-mask-section">
   <div className="photo-mask-heading"><h3>{tx('前景遮挡')}{!!m.occlusions?.length&&<small>{m.occlusions.length}</small>}</h3><button className="icon-button" aria-label={tx('新增遮挡区域')} title={tx('新增遮挡区域')} disabled={drawingMask||(m.occlusions?.length??0)>=100} onClick={()=>{setTool('mask');setDrawingMask(true);setMaskDraft([]);setSelectedMask(null);}}><Icon name="plus"/></button></div><div className="photo-masks">
- {drawingMask&&<><div className="photo-step"><button disabled={maskDraft.length<3} onClick={finishMask}>{tx('完成圈选')}</button><button onClick={()=>{setDrawingMask(false);setMaskDraft([]);}}>{tx('取消圈选')}</button></div><button disabled={!maskDraft.length} onClick={()=>setMaskDraft(v=>v.slice(0,-1))}>{tx('撤回一个点')}</button></>}
- {(m.occlusions??[]).map((_,i)=><div className="photo-step" key={i}><button aria-pressed={selectedMask===i} disabled={drawingMask} onClick={()=>{setSelectedMask(i);setTool('mask');}}>{tx('遮挡区域')} {i+1}</button><button disabled={drawingMask} aria-label={tx('删除遮挡区域 {0}',i+1)} onClick={()=>{checkpoint();updateView({occlusions:m.occlusions!.filter((_,j)=>j!==i)});setSelectedMask(null);}}><Icon name="trash"/></button></div>)}</div></section>}
+ {drawingMask&&<><div className="photo-step"><button disabled={maskDraft.length<3} onClick={finishMask}>{tx('完成圈选')}</button><button onClick={()=>{setDrawingMask(false);setMaskDraft([]);setSelectedMask(null);setTool(coreEdition?(selectingCustom?'pointPlan':'pointPhoto'):firstTool(view));}}>{tx('取消圈选')}</button></div><button disabled={!maskDraft.length} onClick={()=>setMaskDraft(v=>v.slice(0,-1))}>{tx('撤回一个点')}</button></>}
+ {(m.occlusions??[]).map((_,i)=><div className="photo-step" key={i}><button aria-pressed={selectedMask===i} disabled={drawingMask} onClick={()=>{const next=selectedMask===i?null:i;setSelectedMask(next);setTool(next!==null?'mask':coreEdition?'pointPhoto':firstTool(view));}}>{tx('遮挡区域')} {i+1}</button><button disabled={drawingMask} aria-label={tx('删除遮挡区域 {0}',i+1)} onClick={()=>{checkpoint();updateView({occlusions:m.occlusions!.filter((_,j)=>j!==i)});setSelectedMask(null);if(tool==='mask')setTool(coreEdition?'pointPhoto':firstTool(view));}}><Icon name="trash"/></button></div>)}</div></section>}
  {m.roofSignature!==photoRoofSignature(r)&&<p role="alert">{tx('屋面尺寸或轮廓已改变，请核对标注后重新保存。')}</p>}
  </>}
  {ready&&!selectingCustom&&renderScope}
@@ -406,11 +435,12 @@ export function PhotoMatchPanel({roofs,site,initialId,base,overlays,items,sitePo
   {m&&<button disabled={busy||drawingMask} onClick={()=>void saveAnnotations()}><Icon name="save"/>{tx('保存项目')}</button>}
  </>}
  </div>}
- </aside><main inert={busy}><nav role={coreEdition?'toolbar':undefined} aria-label={coreEdition?tx('画布工具'):undefined} className={coreEdition?'photo-view-tools photo-centered-tools':undefined}>{!coreEdition&&<span role="status">{status}</span>}{!coreEdition&&undoButton}<button disabled={!m||drawingMask} aria-label={tx('平移实景照片')} title={tx('平移 · 也可按住中键')} aria-pressed={tool==='pan'} onClick={()=>setTool('pan')}><Icon name="pan"/></button><button disabled={!m} aria-label={tx('放大实景照片')} onClick={()=>changeZoom(z=>Math.min(12,z*1.4))}><Icon name="zoom-in"/></button><button disabled={!m} aria-label={tx('缩小实景照片')} onClick={()=>changeZoom(z=>Math.max(1,z/1.4))}><Icon name="zoom-out"/></button><button disabled={!m} aria-label={tx('适应照片窗口')} title={tx('适应窗口')} onClick={fit}><Icon name="frame"/></button></nav>
+ </aside><main inert={busy}><nav role={coreEdition?'toolbar':undefined} aria-label={coreEdition?tx('画布工具'):undefined} className={coreEdition?'photo-view-tools photo-centered-tools':undefined}>{!coreEdition&&<span role="status">{status}</span>}{!coreEdition&&undoButton}<button disabled={!m||drawingMask} aria-label={tx('平移实景照片')} title={tx('平移 · 也可按住中键')} aria-pressed={tool==='pan'} onClick={togglePan}><Icon name="pan"/></button><button disabled={!m||activeZoom>=zoomBounds(paneKey).max} aria-label={tx('放大实景照片')} onClick={()=>changeZoom(1.4)}><Icon name="zoom-in"/></button><button disabled={!m||activeZoom<=zoomBounds(paneKey).min} aria-label={tx('缩小实景照片')} onClick={()=>changeZoom(1/1.4)}><Icon name="zoom-out"/></button><button disabled={!m} aria-label={tx('适应照片窗口')} title={tx('适应窗口')} onClick={fit}><Icon name="frame"/></button></nav>
  {coreEdition?<div className="photo-main-canvas">
   {m?drawCanvas(selectingCustom):<div className="photo-empty" aria-hidden="true"><Icon name="image"/></div>}
-  {selectingCustom&&<small className="photo-canvas-hint" role="status">{tx('在平面图上选点')}</small>}
-  {!selectingCustom&&marking&&next&&!drawingMask&&<small className="photo-canvas-hint" role="status">{tx('在照片上标记点 {0}',visibleSites.indexOf(next)+1)}</small>}
+  {selectingCustom&&tool!=='pan'&&<small className="photo-canvas-hint" role="status">{tx('在平面图上选点')}</small>}
+  {!selectingCustom&&marking&&next&&!drawingMask&&tool==='pointPhoto'&&<small className="photo-canvas-hint" role="status">{tx('在照片上标记点 {0}',visibleSites.indexOf(next)+1)}</small>}
+  {!drawingMask&&tool==='pan'&&<small className="photo-canvas-hint" role="status">{tx('拖动平移，滚轮缩放')}</small>}
   {!selectingCustom&&drawingMask&&<small className="photo-canvas-hint" role="status">{tx('沿遮挡轮廓选点')}</small>}
  </div>:m?(points?<div className="photo-pair">
   <section data-active={planMode}><h3>{tx('平面图')}</h3>{drawCanvas(true)}</section>

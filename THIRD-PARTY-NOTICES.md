@@ -45,3 +45,7 @@ PDF.js is provided by the pdfjs-dist dependency under Apache-2.0. The build copi
 ## Environment texture
 
 The HDR texture used in the 3D viewport is distributed by Poly Haven under CC0. See [source details](public/textures/README.md).
+
+## Additional browser dependency licenses
+
+The production build includes the installed dependency license texts in `third-party-licenses/`. The React Three Fiber npm package declares MIT but omits the full file. Its upstream license is provided [here](docs/third-party-licenses/react-three-fiber-MIT.txt), from the source commit for v9.7.0.

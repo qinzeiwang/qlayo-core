@@ -120,4 +120,4 @@ button:focus-visible,summary:focus-visible,select:focus-visible,input:focus-visi
 .editor-float .result-detail summary{display:flex;align-items:center}
 .editor-float .result-detail .result-total{margin-left:auto;color:var(--pv-text-secondary);white-space:nowrap}
 .editor-float .result-detail .result-total strong{color:var(--pv-text);font-weight:600}
-.view-only-note{margin:0 16px 8px;padding:8px 10px;border-radius:6px;background:var(--pv-accent-soft,#edf2ff);color:var(--pv-text-secondary,#5d6470);font-size:13px}
+.view-only-note{margin:10px 14px 0;padding:8px 10px;border-radius:6px;background:var(--pv-accent-soft,#edf2ff);color:var(--pv-text-secondary,#5d6470);font-size:13px}
