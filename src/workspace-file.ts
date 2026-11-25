@@ -28,6 +28,7 @@ export function parseWorkspace(text:string):WorkspaceFile {
  if(p.hasRegions!==undefined&&typeof p.hasRegions!=='boolean')throw new Error(tx('区域状态无效'));
  if(!Array.isArray(p.roofs)||!p.roofs.length||p.roofs.length>50||new Set(p.roofs.map(r=>r.id)).size!==p.roofs.length)throw new Error(tx('屋面数量或标识无效'));
  for(const r of p.roofs){
+  if([r.edgeOverride,r.ridgeEdgeOverride].some(edge=>edge!==undefined&&(!Number.isFinite(edge)||edge<0||edge>20)))throw new Error(tx('单独设置的屋面边距无效'));
   if(r.roof?.outline&&(r.pitch||r.carport))throw new Error(tx('多段线轮廓仅支持平屋面'));
   if(r.northAngle!==undefined&&(!Number.isFinite(r.northAngle)||r.northAngle<0||r.northAngle>=360))throw new Error(tx('北向角度无效'));
   r.northAngle=p.baseImage?.northAngle??r.northAngle;

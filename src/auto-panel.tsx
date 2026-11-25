@@ -14,6 +14,7 @@ type Props={
  ridgeEdge:number;
  onEdge:(value:number)=>void;
  onRidgeEdge:(value:number)=>void;
+ onResetEdges?:()=>void;
  onEditArea:()=>void;
 };
 
@@ -30,7 +31,7 @@ function ModeSwitch({checked,label,onToggle,offLabel=tx('自动'),onLabel=tx('�
  </button>;
 }
 
-export function AutoPanel({options,onChange,disabled,edge,ridgeEdge,onEdge,onRidgeEdge,onEditArea}:Props){
+export function AutoPanel({options,onChange,disabled,edge,ridgeEdge,onEdge,onRidgeEdge,onResetEdges,onEditArea}:Props){
  if(options.carport)return null;
  const lightweight=options.module?.kind==='lightweight';
  const rows=options.tableRows??1;
@@ -99,8 +100,9 @@ export function AutoPanel({options,onChange,disabled,edge,ridgeEdge,onEdge,onRid
   <details className="layout-more-settings">
    <summary>{tx('更多布置设置')}</summary>
    {!lightweight&&numeric('tableRows',tx('最大排数'),'layout-connected-rows',tx('排'),1,options.pitch?6:MAX_FLAT_TABLE_ROWS,1,rows)}
-   <NumberProperty icon="layout-perimeter" label={tx('全局屋面边距 m')} textLabel={tx('屋面四周间距')} min={0} max={20} value={edge} onChange={onEdge}/>
-   <NumberProperty icon="layout-ridge" label={tx('全局屋脊边距 m')} textLabel={tx('屋脊间距')} min={0} max={20} value={ridgeEdge} onChange={onRidgeEdge} disabled={!options.pitch}/>
+   <NumberProperty icon="layout-perimeter" label={tx('屋面四周间距')} textLabel={tx('屋面四周间距')} min={0} max={20} value={edge} onChange={onEdge}/>
+   {options.pitch&&<NumberProperty icon="layout-ridge" label={options.pitch.kind==='gable'?tx('屋脊间距'):tx('高侧间距')} textLabel={options.pitch.kind==='gable'?tx('屋脊间距'):tx('高侧间距')} min={0} max={20} value={ridgeEdge} onChange={onRidgeEdge}/>}
+   {onResetEdges&&<button type="button" className="layout-setback-reset" onClick={onResetEdges}>{tx('恢复项目默认边距')}</button>}
    {(options.pitch?.kind==='gable'||!options.pitch&&!lightweight)&&<Field icon="layout-alignment" label={tx('布置对齐')}>
      <div className="seg-track edge-options" role="group" aria-label={tx('布置对齐')}><button type="button" className="seg-btn" aria-pressed={centered} onClick={()=>{if(!centered)onChange({...options,alignment:'center'});}}>{tx('居中')}</button><button type="button" className="seg-btn" aria-pressed={!centered} onClick={()=>{if(centered)onChange({...options,alignment:'edge'});}}>{tx('靠边')}</button></div>
 

@@ -43,7 +43,7 @@ import {isTextEditing,useProjectHistory} from './use-project-history';
 import {ProjectStart} from './project-start';
 import {reportReadiness} from './scheme-report';
 import {LayoutReport} from './layout-report';
-import {layoutSignatureFor} from './layout-state';
+import {layoutSignatureFor,roofLayoutEdges} from './layout-state';
 import {applyRegionForm,initialRegionForm,type RegionForm} from './region-form';
 import {DisplayPopover,SunPopover} from './display-popover';
 import type { CarportOptions } from './carport';
@@ -216,6 +216,7 @@ function App() {
   useEffect(()=>{if(!['已保存：{0}','已取消保存','全部屋面已布置'].some(text=>startsWithText(fileMessage,text)))return;const timer=setTimeout(()=>setFileMessage(''),5000);return()=>clearTimeout(timer);},[fileMessage]);
   const running = progress.startsWith("第")||progress.startsWith("Round");
   const edges={edge:globalEdge,ridge:globalRidgeEdge};
+  const activeEdges=roofLayoutEdges(active,edges);
   const currentSignature = layoutSignatureFor(active,edges);
   const layoutStale = layoutSignature !== currentSignature;
   const needsOutline=!!baseImage&&(!baseImage.metersPerPixel||!hasSelection);
@@ -228,7 +229,7 @@ function App() {
     try {
       if(needsOutline)throw new Error(tx('请先标定并圈屋面'));
       if(overlappingRoofs.length)throw new Error(tx('当前屋面与其他屋面重叠，请先调整轮廓'));
-      const result = autoLayout(roof, obstacles, { ...options, removeIsolated:true, alignment:options.alignment??DEFAULT_WORKBENCH_ALIGNMENT,edge:globalEdge, ridgeEdge:globalRidgeEdge, carport:active.carport, pitch:active.pitch, wallHeight, module: moduleSpec, roofYaw:geographicYaw(active), limit:MAX_PROJECT_PANELS-totals(roofs.filter(r=>r.id!==active.id)).count },coreEdition?neighborShadowCasters(active,roofs):[]);
+      const result = autoLayout(roof, obstacles, { ...options, removeIsolated:true, alignment:options.alignment??DEFAULT_WORKBENCH_ALIGNMENT,...activeEdges, carport:active.carport, pitch:active.pitch, wallHeight, module: moduleSpec, roofYaw:geographicYaw(active), limit:MAX_PROJECT_PANELS-totals(roofs.filter(r=>r.id!==active.id)).count },coreEdition?neighborShadowCasters(active,roofs):[]);
       setFileMessage("");
       setLayoutSignature(currentSignature);
       setSelectedObstacle(null);
@@ -683,7 +684,7 @@ function App() {
       if(roofs.some((r,i)=>roofs.slice(i+1).some(s=>overlaps(roofRect(r),roofRect(s)))))throw new Error(tx('屋面之间存在重叠，请先调整轮廓'));
       let remaining=MAX_PROJECT_PANELS;
       const next=roofs.map(r=>{
-        const result=autoLayout(r.roof,r.obstacles,{...r.layoutOptions,removeIsolated:true,alignment:r.layoutOptions.alignment??DEFAULT_WORKBENCH_ALIGNMENT,edge:globalEdge,ridgeEdge:globalRidgeEdge,carport:r.carport,pitch:r.pitch,module:r.moduleSpec,wallHeight:r.wallHeight,roofYaw:geographicYaw(r),limit:remaining},coreEdition?neighborShadowCasters(r,roofs):[]);
+        const result=autoLayout(r.roof,r.obstacles,{...r.layoutOptions,removeIsolated:true,alignment:r.layoutOptions.alignment??DEFAULT_WORKBENCH_ALIGNMENT,...roofLayoutEdges(r,edges),carport:r.carport,pitch:r.pitch,module:r.moduleSpec,wallHeight:r.wallHeight,roofYaw:geographicYaw(r),limit:remaining},coreEdition?neighborShadowCasters(r,roofs):[]);
         remaining-=result.count;
         return {...r,previous:r.arrays,arrays:result.arrays,layoutSignature:layoutSignatureFor(r,edges),layoutMessage:''};
       });
@@ -822,7 +823,12 @@ function App() {
             })}
            </div>
           </div>}
-          <AutoPanel edge={globalEdge} ridgeEdge={globalRidgeEdge} onEdge={setGlobalEdge} onRidgeEdge={setGlobalRidgeEdge} onEditArea={()=>{
+          <AutoPanel edge={activeEdges.edge} ridgeEdge={activeEdges.ridgeEdge}
+            onEdge={edgeOverride=>setRoofs(rs=>rs.map(r=>r.id===active.id?{...r,edgeOverride}:r))}
+            onRidgeEdge={ridgeEdgeOverride=>setRoofs(rs=>rs.map(r=>r.id===active.id?{...r,ridgeEdgeOverride}:r))}
+            onResetEdges={active.edgeOverride!==undefined||active.pitch&&active.ridgeEdgeOverride!==undefined
+              ?()=>setRoofs(rs=>rs.map(r=>r.id===active.id?{...r,edgeOverride:undefined,...(r.pitch?{ridgeEdgeOverride:undefined}:{})}:r))
+              :undefined} onEditArea={()=>{
            if(!baseImage){const blank=blankDrawing();setBaseImage(blank);drawingView.current=blankDrawingInitialView(blank);}
            setMode('top');setNavigationMode('select');setMeasureTool(null);setCanvasMenu(null);setDisplayOpen(false);setSunOpen(false);setOverlayOpen(false);
            setDrawingIntent('keepout');setDrawingTool('keepout');setDrawingForm(undefined);setLayoutAreaOpen(true);setImageOpen(true);

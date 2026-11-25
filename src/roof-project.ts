@@ -9,6 +9,7 @@ import {standardModuleId} from './module-library';
 import {tx} from './i18n';
 export type RoofDesign = {
   northAngle?:number;
+  edgeOverride?:number; ridgeEdgeOverride?:number;
   carport?:CarportOptions;
   pitch?:RoofPitch; flatHeight?:number;
   id:string; name:string; x:number; z:number; yaw:number;

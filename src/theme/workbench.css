@@ -751,6 +751,8 @@ input[type=checkbox],input[type=radio],input[type=range]{accent-color:var(--pv-a
 .layout-inspector .layout-more-settings{border-top:1px solid var(--pv-border);padding-top:6px}
 .layout-inspector .layout-more-settings>summary{cursor:pointer;font:500 13px/24px var(--pv-font-sans)}
 
+.layout-setback-reset{display:block;margin:3px 0 5px auto;padding:4px 6px;border:0;background:transparent;color:var(--pv-text-secondary);font:400 12px var(--pv-font-sans)}
+.layout-setback-reset:hover{background:var(--pv-surface-slot)}
 .layout-limit-action{display:flex;align-items:center;gap:8px;width:100%;min-height:32px;margin:5px 0 0;padding:0;border:0;background:transparent;color:var(--pv-text-secondary);font:400 13px var(--pv-font-sans);text-align:left}
 .layout-limit-action span{flex:1}
 .layout-limit-action .ui-icon[data-icon]{width:16px!important;height:16px!important;flex:none}
