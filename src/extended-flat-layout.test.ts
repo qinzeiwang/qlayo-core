@@ -6,9 +6,10 @@ import {instanceData} from './realistic';
 import {newRoof} from './roof-project';
 import {parseWorkspace} from './workspace-file';
 import {photoRoofArrays} from './photo-roof';
+import {MAX_FLAT_TABLE_ROWS} from './project-limits';
 const options={portrait:true,tilt:10,edge:.5,gap:1,maxColumns:12,wallHeight:0,shadowLatitude:31.23};
-for(const tableRows of [5,6,8,12,20])it(`places and reopens ${tableRows} connected rows at a raised front height`,()=>{
- const r=newRoof();r.roof={width:100,depth:150};r.wallHeight=0;r.layoutOptions={...options,tableRows,frontHeight:1.5,alignment:'center'};
+for(const tableRows of [5,6,8,12,20,36,MAX_FLAT_TABLE_ROWS])it(`places and reopens ${tableRows} connected rows at a raised front height`,()=>{
+ const r=newRoof();r.roof={width:100,depth:Math.max(150,tableRows*2.5)};r.wallHeight=0;r.layoutOptions={...options,tableRows,frontHeight:1.5,alignment:'center'};
  const result=autoLayout(r.roof,[],r.layoutOptions);r.arrays=result.arrays;
  expect(result.arrays.some(a=>a.rows===tableRows)).toBe(true);expect(detect(result.arrays,[],r.roof)).toEqual([]);
  const a=result.arrays.find(a=>a.rows===tableRows)!,g=geometry(a),low=g.panels.at(-1)!.y-g.l/2*Math.sin(g.tilt);
@@ -39,7 +40,7 @@ it('keeps legacy rendering unchanged and uses one consistent height for new layo
 });
 it('rejects invalid front heights and out of range rows',()=>{
  for(const frontHeight of [-1,0,.19,10.1,NaN,Infinity])expect(()=>autoLayout({width:100,depth:100},[],{...options,frontHeight})).toThrow('前沿高度');
- for(const tableRows of [0,21,4.5])expect(()=>autoLayout({width:100,depth:100},[],{...options,tableRows})).toThrow('连排');
+ for(const tableRows of [0,MAX_FLAT_TABLE_ROWS+1,4.5])expect(()=>autoLayout({width:100,depth:100},[],{...options,tableRows})).toThrow('连排');
  const r=newRoof();r.layoutOptions.frontHeight=-1;
  expect(()=>parseWorkspace(JSON.stringify({version:3,name:'invalid',roofs:[r],activeId:r.id,solarHour:9,backgroundColor:'#ffffff',groundColor:'#dddddd'}))).toThrow('前沿高度');
 });

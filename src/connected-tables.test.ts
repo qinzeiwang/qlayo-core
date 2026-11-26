@@ -6,6 +6,7 @@ import { autoLayout, tableSpacing } from './auto-layout';
 import { recommendedGap } from './solar';
 import { hitsShadow, shadowZones } from './shadow-zones';
 import { parseProject, type ProjectFile } from './project-file';
+import { MAX_FLAT_TABLE_ROWS } from './project-limits';
 const options = {portrait:true,tilt:20,edge:.5,gap:1,maxColumns:8,wallHeight:.32};
 
 it('places two and three connected rows in one tilted plane with module-sized joints', () => {
@@ -50,7 +51,7 @@ it('allows shortened spacing to increase capacity without physical overlap or in
 it('keeps complete three-row strips at the capacity limit and rejects invalid modes',()=>{
   const result=autoLayout({width:200,depth:200},[],{...options,tableRows:3,tilt:0});
   expect(result.capped).toBe(true);expect(result.count).toBe(9999);
-  expect(()=>autoLayout({width:30,depth:20},[],{...options,tableRows:21})).toThrow();
+  expect(()=>autoLayout({width:30,depth:20},[],{...options,tableRows:MAX_FLAT_TABLE_ROWS+1})).toThrow();
   expect(()=>autoLayout({width:30,depth:20},[],{...options,rowGap:-1,spacingMode:'manual'})).toThrow();
 });
 
@@ -60,7 +61,7 @@ it('preserves legacy independent-row geometry when opening old projects',()=>{
   const loaded=parseProject(JSON.stringify(project));
   expect(geometry(loaded.arrays[0])).toEqual(geometry(a));
   expect(loaded.arrays[0].connectedRows).toBeUndefined();
-  expect(()=>parseProject(JSON.stringify({...project,rules:{...options,tableRows:21}}))).toThrow();
+  expect(()=>parseProject(JSON.stringify({...project,rules:{...options,tableRows:MAX_FLAT_TABLE_ROWS+1}}))).toThrow();
 });
 
 it('keeps the surviving high row at the same height as the neighboring full table',()=>{
