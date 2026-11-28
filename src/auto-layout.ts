@@ -10,6 +10,7 @@ import { MAX_FLAT_TABLE_ROWS, MAX_PROJECT_PANELS } from './project-limits';
 import { carportLayout, type CarportOptions } from './carport';
 import { standardPitchedLayout } from './standard-pitched-layout';
 import { pitchedLayout, type RoofPitch } from './pitched-roof';
+import { gableSelfShadowCasters } from './gable-geometry';
 import { recommendedGap,winterRays } from './solar';
 import { shadowZones, parapets } from './shadow-zones';
 import { corners, geometry, initial, overlaps, defaultModule, DEFAULT_FRONT_HEIGHT, validModule, type ModuleSpec, type Obstacle, type PVArray } from './domain';
@@ -49,7 +50,9 @@ export function tableSpacing(options: LayoutOptions) {
 // Scan whole connected table strips; an obstacle excludes all rows in that strip.
 function baseAutoLayout(roof: Footprint, obstacles: Obstacle[], options: LayoutOptions,neighbors:readonly ShadowCaster[]=[]) {
   const winter=winterRays(options.shadowLatitude),yaw=options.roofYaw??0;
-  const neighborBlocked=neighbors.length?createPanelOcclusion(roof,[],0,yaw,winter,neighbors).blocked:undefined;
+  const selfCasters=options.pitch?.kind==='gable'&&options.pitch.spans&&options.pitch.spans.length>1?gableSelfShadowCasters(roof,options.pitch,tx('相邻坡面')):[];
+  const allNeighbors=selfCasters.length?[...neighbors,...selfCasters]:neighbors;
+  const neighborBlocked=allNeighbors.length?createPanelOcclusion(roof,[],0,yaw,winter,allNeighbors).blocked:undefined;
   if(options.carport)return carportLayout(roof,obstacles,{...options,carport:options.carport,neighborBlocked});
   const lightweight=options.module?.kind==='lightweight'||(options.module?.kind===undefined&&!!options.pitch);
   if(lightweight)return pitchedLayout(roof,obstacles,{...options,neighborBlocked,forbidden:options.pitch?pitchedShadowZones(roof,obstacles,options.pitch,yaw,winter,0,options.wallHeight):shadowZones(roof,obstacles,options.wallHeight??.32,yaw,winter),pitch:options.pitch??{kind:'single',axis:'z',high:-1,percent:0,eave:3.5}});
@@ -150,7 +153,7 @@ export function autoLayout(roof:Footprint,obstacles:Obstacle[],options:LayoutOpt
  if(activeLayoutArea(options)&&(options.pitch||options.carport||options.module?.kind==='lightweight'))throw new Error(tx('限定布置区域目前用于平屋面标准组件，请先关闭区域限制'));
  if(options.shadowIgnored)throw new Error(tx('必须填写项目地点或经纬度，阴影校核不能跳过'));
  for(const o of obstacles)if(o.topLayout&&(!Number.isFinite(o.topLayout.tilt)||o.topLayout.tilt<0||o.topLayout.tilt>60||!Number.isFinite(o.topLayout.edge)||o.topLayout.edge<0||o.topLayout.edge>20))throw new Error(tx("附属建筑顶部参数无效"));
- if(roof.outline&&(options.pitch||options.carport))throw new Error(tx("多段线轮廓仅支持平屋面"));
+ if(roof.outline&&(options.carport||(options.pitch&&options.pitch.kind!=='gable')))throw new Error(tx("多段线轮廓仅支持平屋面、双坡屋面、连坡屋面和障碍建筑"));
  if(options.shadowLatitude!==undefined&&(!Number.isFinite(options.shadowLatitude)||Math.abs(options.shadowLatitude)>90||!winterRays(options.shadowLatitude).length))throw new Error(tx('所在地冬至没有有效日照，需另定校核时段；当前自动校核不适用'));
  const result=baseAutoLayout(roof,obstacles,options,neighbors);if(options.carport)return result;
  const arrays=[...result.arrays];let count=result.count,capped=!!result.capped;const limit=options.limit??MAX_PROJECT_PANELS;

@@ -15,7 +15,14 @@ type Props={
  onChoose:(id:string)=>void;onRename:(name:string)=>void;
  onReshape:()=>void;onDuplicate:()=>void;onDelete:()=>void;onUndoDelete:()=>void;
  onChangeType?:(kind:RoofShapeTarget)=>void;
+ onToggleShadingOnly?:()=>void;
 };
+function regionIcon(r:RoofDesign){
+ if(r.shadingOnly)return 'obstacle-building';
+ if(r.carport)return r.carport.double?'double-carport':'single-carport';
+ if(r.pitch?.kind==='gable'&&r.pitch.spans)return 'multi-gable-roof';
+ return `${r.pitch?.kind??'flat'}-roof`;
+}
 /** Run a region-menu action and close the menu first. */
 const menuAction=(action:()=>void)=>(e:{currentTarget:Element})=>{e.currentTarget.closest('details')?.removeAttribute('open');action();};
 
@@ -42,7 +49,7 @@ export function RegionBar(p:Props){
  }
 
  const full=importing||running||p.roofs.length>=50;
- const canSwitchType=!active.carport&&!active.roof.outline&&!!p.onChangeType;
+ const canSwitchType=!active.carport&&!active.shadingOnly&&!active.pitch?.spans&&!!p.onChangeType;
  const currentShape:RoofShapeTarget=active.pitch?.kind??'flat';
 
  return <header inert={p.locked} className="region-context-header">
@@ -64,7 +71,7 @@ export function RegionBar(p:Props){
     menu.querySelector('summary')?.focus();
    }}>
     <summary className="region-title region-title-switch" title={active.name}><span>{active.name}</span><Icon name="chevron"/></summary>
-    <div className="region-menu-items"><div className="region-menu-group"><span>{tx('切换区域')}</span>{p.roofs.map(r=><button key={r.id} aria-current={r.id===active.id?'true':undefined} onClick={menuAction(()=>p.onChoose(r.id))}><Icon name={r.carport?(r.carport.double?'double-carport':'single-carport'):`${r.pitch?.kind??'flat'}-roof`}/><span className="region-switch-name">{r.name}</span>{r.id===active.id&&<Icon name="check"/>}</button>)}</div></div>
+    <div className="region-menu-items"><div className="region-menu-group"><span>{tx('切换区域')}</span>{p.roofs.map(r=><button key={r.id} aria-current={r.id===active.id?'true':undefined} onClick={menuAction(()=>p.onChoose(r.id))}><Icon name={regionIcon(r)}/><span className="region-switch-name">{r.name}</span>{r.id===active.id&&<Icon name="check"/>}</button>)}</div></div>
    </details>:<span className="region-title" title={active.name}>{active.name}</span>
   )}
 
@@ -81,19 +88,20 @@ export function RegionBar(p:Props){
        <summary><Icon name={`${currentShape}-roof`}/>{tx('屋面类型')}<Icon name="chevron"/></summary>
        <div>
         {([['flat',tx('平屋面')],['gable',tx('双坡屋面')],['single',tx('单坡屋面')]] as const).map(([kind,label])=>(
-         <button key={kind} disabled={running||currentShape===kind} onClick={menuAction(()=>{menuRef.current?.removeAttribute('open');p.onChangeType!(kind);})}>
+         <button key={kind} disabled={running||currentShape===kind||(kind==='single'&&!!active.roof.outline)} onClick={menuAction(()=>{menuRef.current?.removeAttribute('open');p.onChangeType!(kind);})}>
           <Icon name={`${kind}-roof`}/>{label}{currentShape===kind&&<Icon name="check"/>}
          </button>
         ))}
        </div>
       </details>}
+      {!active.carport&&p.onToggleShadingOnly&&<button disabled={running} onClick={menuAction(p.onToggleShadingOnly)}><Icon name="obstacle-building"/>{active.shadingOnly?tx('转为可布置屋面'):tx('仅作遮挡（不布置）')}</button>}
       <button className="danger" disabled={running} onClick={menuAction(p.onDelete)}><Icon name="trash"/>{tx('删除区域')}</button>
       {p.canUndoDelete&&<button onClick={menuAction(p.onUndoDelete)}><Icon name="reset"/>{tx('撤回删除')}</button>}
      </div>
      <div className="region-menu-group">
       <span>{tx('切换区域')}</span>
       {p.roofs.map(r=><button key={r.id} aria-current={r.id===active.id?'true':undefined} onClick={menuAction(()=>p.onChoose(r.id))}>
-       <Icon name={r.carport?(r.carport.double?'double-carport':'single-carport'):`${r.pitch?.kind??'flat'}-roof`}/><span className="region-switch-name">{r.name}</span>{r.id===active.id&&<Icon name="check"/>}
+       <Icon name={regionIcon(r)}/><span className="region-switch-name">{r.name}</span>{r.id===active.id&&<Icon name="check"/>}
       </button>)}
      </div>
     </div>

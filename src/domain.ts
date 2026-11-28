@@ -217,9 +217,18 @@ export function copyArray(a: PVArray, id: string, name: string): PVArray {
 }
 export type Mode = "top" | "3d";
 export type LayoutImageScope='fit'|'screen'|'site';
-export type LayoutImageOptions={scope:LayoutImageScope;siteId?:string;includeBase:boolean;includeLabels:boolean;includeGrid:boolean};
-export type SceneSite = Rect & {layoutArea?:Point[];markerPitch?:import("./pitched-roof").RoofPitch;id:string;name:string;planNumber?:number;/** Installed kWp, shown in the roof's 2D tag. */capacity?:number;wallHeight:number;flatHeight?:number; carport?:import("./carport").CarportOptions; pitch?:import("./pitched-roof").RoofPitch};
+export type LayoutImageOrientation='north'|'current';
+export type LayoutImageOptions={scope:LayoutImageScope;siteId?:string;includeBase:boolean;includeLabels:boolean;includeGrid:boolean;orientation?:LayoutImageOrientation};
+export type SceneSite = Rect & {shadingOnly?:boolean;layoutArea?:Point[];markerPitch?:import("./pitched-roof").RoofPitch;id:string;name:string;planNumber?:number;/** Installed kWp, shown in the roof's 2D tag. */capacity?:number;wallHeight:number;flatHeight?:number; carport?:import("./carport").CarportOptions; pitch?:import("./pitched-roof").RoofPitch};
 export type ViewProps = {
+  /** 2D view: clockwise rotation in degrees (0 = default / north-up). */
+  viewRotation?:number;
+  /** True while inline drawing/editing overlay is active (makes existing roofs & elements translucent). */
+  drawingMode?:boolean;
+  /** Site currently being reshaped or cut in the inline drawing overlay. */
+  editingSiteId?:string;
+  /** Highlighted span index on the selected multi-span gable roof. */
+  highlightedSpanIndex?:number|null;
   /** Where north points on screen (degrees clockwise from up), after every view change in 2D and 3D. */
   onNorth?:(degrees:number)=>void;
   /** 2D measure tool in use, a counter that clears every measurement when it changes, and the number of measurements shown. */

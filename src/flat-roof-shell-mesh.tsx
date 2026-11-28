@@ -28,8 +28,8 @@ export function FlatRoofShellMesh({site,selected,showShadows,attached}:{site:Sce
  useEffect(()=>()=>contactGeometry?.dispose(),[contactGeometry]);
  useEffect(()=>()=>edges.dispose(),[edges]);
  return <group position={[0,-3.5,0]}>
-  <mesh geometry={contactGeometry??shell.geometry} castShadow receiveShadow userData={{siteId:site.id}}><MaquetteWallMaterial/></mesh>
-  <lineSegments geometry={edges}><lineBasicMaterial color={selected?'#6b8a94':'#969e9c'} transparent opacity={selected?.40:.22} depthWrite={false} toneMapped={false}/></lineSegments>
+  <mesh geometry={contactGeometry??shell.geometry} castShadow receiveShadow userData={{siteId:site.id}}><MaquetteWallMaterial shading={!!site.shadingOnly}/></mesh>
+  <lineSegments geometry={edges}><lineBasicMaterial color={selected?'#6b8a94':site.shadingOnly?'#64748b':'#969e9c'} transparent opacity={selected?.40:site.shadingOnly?.38:.22} depthWrite={false} toneMapped={false}/></lineSegments>
   {showShadows&&<mesh geometry={shell.roofGeometry} receiveShadow renderOrder={12}>
    <shadowMaterial color="#777d79" opacity={.20} depthWrite={false} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1}/>
   </mesh>}

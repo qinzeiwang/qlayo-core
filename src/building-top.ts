@@ -1,10 +1,19 @@
 import {corners,type Obstacle} from './domain';
-import {roofHeight,type RoofPitch} from './pitched-roof';
+import {gableSpans,roofHeight,type RoofPitch} from './pitched-roof';
 import type {SunRay} from './solar';
 import {shadowZones} from './shadow-zones';
 export function buildingTop(roof:{width:number;depth:number},pitch:RoofPitch|undefined,o:Obstacle){
  if(!pitch)return o.height;
- const points=corners(o);if(pitch.kind==='gable')for(let i=0;i<4;i++){const a=points[i],b=points[(i+1)%4],va=pitch.axis==='x'?a.x:a.z,vb=pitch.axis==='x'?b.x:b.z;if(va*vb<0){const t=-va/(vb-va);points.push({x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t});}}
+ const points=corners(o);
+ if(pitch.kind==='gable'){
+  const ridges=gableSpans(roof,pitch).map(s=>(s.start+s.end)/2);
+  for(let i=0;i<4;i++){
+   const a=points[i],b=points[(i+1)%4],va=pitch.axis==='x'?a.x:a.z,vb=pitch.axis==='x'?b.x:b.z;
+   for(const mid of ridges){
+    if((va-mid)*(vb-mid)<0){const t=(mid-va)/(vb-va);points.push({x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t});}
+   }
+  }
+ }
  return Math.max(...points.map(p=>roofHeight(roof,pitch,p.x,p.z)))+o.height;
 }
 export function buildingContext(roof:{width:number;depth:number},pitch:RoofPitch|undefined,objects:Obstacle[],host:Obstacle){

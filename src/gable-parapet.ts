@@ -1,10 +1,10 @@
 import type {Point} from './domain';
-import {roofHeight,type RoofPitch} from './pitched-roof';
+import {maxRoofHeight,roofHeight,type RoofPitch} from './pitched-roof';
 
 export const pitchSkinOffset=.025;
 const ground=-3.5;
 export const gableCopingHeight=(roof:{width:number;depth:number},pitch:RoofPitch,wallHeight:number)=>
- roofHeight(roof,pitch,0,0)+pitchSkinOffset+wallHeight;
+ maxRoofHeight(roof,pitch)+pitchSkinOffset+wallHeight;
 
 /** Grid shared by the shell and roof contacts. The two middle cells meet at the ridge. */
 export function gableParapetPlan(roof:{width:number;depth:number},pitch:RoofPitch,wallHeight:number){

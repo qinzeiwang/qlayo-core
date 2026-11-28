@@ -4,8 +4,11 @@
 export const canvasStyle={
  minorGrid:'#cbd0d6',majorGrid:'#bdc4cc',roof:'#f9faf9',
  planRoof:'#f9fafb',planObject:'#e5eaf0',planEdge:'#aeb8c5',
+ planShadingRoof:'#cfd5dc',planShadingEdge:'#707d8c',
+ maquetteShadingRoof:'#b9c0c8',
  planColumnEdge:'#776783',
  planRidge:'#929ba6',
+ planGutter:'#64748b',
  planObjectSelectedEdge:'#246763',planObjectSelectedFill:'#32948a',
 } as const;
 export const planElementColours={

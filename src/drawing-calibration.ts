@@ -1,6 +1,7 @@
 import type {BaseImage} from './base-image';
 import type {Point} from './domain';
 import {rescaleLayoutArea} from './layout-area';
+import {rescaleGableSpans} from './pitched-roof';
 import type {ProjectDocument} from './project-document';
 import {validRoofSize} from './roof-limits';
 import {tx} from './i18n';
@@ -21,7 +22,10 @@ export function recalibrateDrawing(project:ProjectDocument,base:BaseImage):Proje
  const roofs=project.roofs.map(roof=>{
   if(!changed)return {...roof,northAngle:base.northAngle};
   const scalePoint=({x,z}:Point)=>({x:x*ratio,z:z*ratio});
+  const pitch=roof.pitch;
+  const span=pitch?.axis==='x'?roof.roof.width:roof.roof.depth;
   return {...roof,...scalePoint(roof),northAngle:base.northAngle,
+   ...(pitch?.spans?{pitch:{...pitch,spans:rescaleGableSpans(pitch.spans,span,span*ratio)}}:{}),
    roof:{width:roof.roof.width*ratio,depth:roof.roof.depth*ratio,outline:roof.roof.outline?.map(scalePoint)},
    layoutOptions:rescaleLayoutArea(roof.layoutOptions,ratio),
    obstacles:roof.obstacles.map(object=>({...object,...scalePoint(object),width:object.width*ratio,depth:object.depth*ratio})),

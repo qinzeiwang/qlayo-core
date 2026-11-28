@@ -1,7 +1,7 @@
 import {detect,overlaps} from './domain';
 import {layoutAreaIssues} from './layout-area';
 import {geographicYaw,roofRect} from './roof-project';
-import {neighborShadowCasters} from './neighbor-shadows';
+import {layoutShadowSources,neighborShadowCasters} from './neighbor-shadows';
 import {createPanelOcclusion} from './panel-occlusion';
 import {winterRays} from './solar';
 import {carportBoundary} from './carport';
@@ -11,10 +11,12 @@ import {needsLayoutUpdate,type Edges} from './layout-state';
 import type {RoofDesign} from './roof-project';
 export const escapeHtml=(v:unknown)=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 export function reportReadiness(roofs:RoofDesign[],edge:Edges,includeNeighborShadows=false){
+ const sources=layoutShadowSources(roofs,includeNeighborShadows);
  return roofs.filter(r=>{
-  if(!r.arrays.length||layoutAreaIssues(r.arrays,r.layoutOptions).length||needsLayoutUpdate(r,edge)||detect(r.arrays,r.obstacles,carportBoundary(r.roof,r.carport,r.layoutOptions.portrait)).length||roofs.some(other=>other.id!==r.id&&overlaps(roofRect(r),roofRect(other))))return true;
-  if(!includeNeighborShadows||r.layoutOptions.shadowIgnored)return false;
-  const neighbors=neighborShadowCasters(r,roofs);
+  if(r.shadingOnly)return false;
+  if(!r.arrays.length||layoutAreaIssues(r.arrays,r.layoutOptions).length||needsLayoutUpdate(r,edge,sources)||detect(r.arrays,r.obstacles,carportBoundary(r.roof,r.carport,r.layoutOptions.portrait)).length||roofs.some(other=>other.id!==r.id&&overlaps(roofRect(r),roofRect(other))))return true;
+  if(!sources.length||r.layoutOptions.shadowIgnored)return false;
+  const neighbors=neighborShadowCasters(r,sources);
   return neighbors.length>0&&r.arrays.some(createPanelOcclusion(r.roof,[],0,geographicYaw(r),winterRays(r.layoutOptions.shadowLatitude),neighbors).blocked);
  }).map(r=>r.name);
 }

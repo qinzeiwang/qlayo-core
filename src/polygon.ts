@@ -18,7 +18,15 @@ export function validOutline(r:Footprint){const p=r.outline;if(p===undefined)ret
  for(let i=0;i<p.length;i++){const a=p[i],b=p[(i+1)%p.length];if(Math.hypot(a.x-b.x,a.z-b.z)<.05)return false;for(let j=i+1;j<p.length;j++){if(j===i+1||(i===0&&j===p.length-1))continue;const c=p[j],d=p[(j+1)%p.length];if(intersects(a,b,c,d)||Math.min(segmentDistance(a,c,d),segmentDistance(b,c,d),segmentDistance(c,a,b),segmentDistance(d,a,b))<eps)return false;}}
  return true;
 }
-export function polygonRect(points:Point[]){const xs=points.map(p=>p.x),zs=points.map(p=>p.z),x=(Math.min(...xs)+Math.max(...xs))/2,z=(Math.min(...zs)+Math.max(...zs))/2;const r={x,z,yaw:0,width:Math.max(...xs)-Math.min(...xs),depth:Math.max(...zs)-Math.min(...zs),outline:points.map(p=>({x:p.x-x,z:p.z-z}))};if(!validOutline(r))throw new Error(tx('轮廓需至少三个点，不能交叉、重叠或过小'));return r;}
+export function polygonRect(points:Point[],yaw=0){
+ const c=Math.cos(yaw),s=Math.sin(yaw);
+ const local=Math.abs(yaw)<1e-12?points:points.map(p=>({x:p.x*c-p.z*s,z:p.x*s+p.z*c}));
+ const xs=local.map(p=>p.x),zs=local.map(p=>p.z),cu=(Math.min(...xs)+Math.max(...xs))/2,cv=(Math.min(...zs)+Math.max(...zs))/2;
+ const x=Math.abs(yaw)<1e-12?cu:cu*c+cv*s,z=Math.abs(yaw)<1e-12?cv:-cu*s+cv*c;
+ const r={x,z,yaw,width:Math.max(...xs)-Math.min(...xs),depth:Math.max(...zs)-Math.min(...zs),outline:local.map(p=>({x:p.x-cu,z:p.z-cv}))};
+ if(!validOutline(r))throw new Error(tx('轮廓需至少三个点，不能交叉、重叠或过小'));
+ return r;
+}
 
 export function polygonsOverlap(a:Point[],b:Point[]){
  const strict=(p:Point,poly:Point[])=>insidePolygon(p,poly)&&poly.every((v,i)=>segmentDistance(p,v,poly[(i+1)%poly.length])>eps);

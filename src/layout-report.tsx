@@ -19,9 +19,10 @@ function summarize(rows:Row[]):Metrics{
 
 export function LayoutReport({name,roofs,pending,onClose}:{name:string;roofs:RoofDesign[];pending:string[];onClose:()=>void}){
  useDialog('.layout-report-dialog',true,onClose);
- const rows=projectStatistics(roofs).regions.map((r,i):Row=>({
+ const activeRoofs=roofs.filter(r=>!r.shadingOnly);
+ const rows=projectStatistics(activeRoofs).regions.map((r,i):Row=>({
   id:r.id,name:r.name,type:r.type,carport:r.isCarport,
-  count:r.count,capacity:r.capacity,area:footprintArea(roofs[i].roof),moduleArea:r.moduleArea,
+  count:r.count,capacity:r.capacity,area:footprintArea(activeRoofs[i].roof),moduleArea:r.moduleArea,
  }));
  const groups=[{label:tx('屋面小计'),rows:rows.filter(r=>!r.carport)},{label:tx('车棚小计'),rows:rows.filter(r=>r.carport)}].filter(g=>g.rows.length);
  const total=summarize(rows);

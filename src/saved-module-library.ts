@@ -1,10 +1,32 @@
-import {defaultModuleCatalog,parseModuleCatalog,sameModule,type ModuleCatalogItem} from './module-library';
+import {defaultModuleCatalog,isLegacyBuiltInModule,parseModuleCatalog,sameModule,type ModuleCatalogItem} from './module-library';
 import {tx} from './i18n';
 import {newId} from './ids';
-const key='pvlane.module-library.v1';
+const key='pvlane.module-library.v2';
+const legacyKey='pvlane.module-library.v1';
 export type SavedModuleLibrary={items:ModuleCatalogItem[];defaultId:string};
 type Storage=Pick<globalThis.Storage,'getItem'|'setItem'>;
-export function readModuleLibrary(storage?:Storage):SavedModuleLibrary{try{const raw=(storage??localStorage).getItem(key);if(raw){const v=JSON.parse(raw),items=parseModuleCatalog(v.items,[]);if(!items.some(i=>i.id===v.defaultId))throw Error();return {items,defaultId:v.defaultId};}}catch{/* Invalid or unavailable storage falls back to built-in modules. */}const items=defaultModuleCatalog();return {items,defaultId:items[0].id};}
+export function readModuleLibrary(storage?:Storage):SavedModuleLibrary{
+ try{
+  const store=storage??localStorage;
+  const raw=store.getItem(key);
+  if(raw){
+   const v=JSON.parse(raw),items=parseModuleCatalog(v.items,[]);
+   if(!items.some(i=>i.id===v.defaultId))throw Error();
+   return {items,defaultId:v.defaultId};
+  }
+  const legacyRaw=store.getItem(legacyKey);
+  if(legacyRaw){
+   const v=JSON.parse(legacyRaw),parsed=parseModuleCatalog(v.items,[]);
+   const custom=parsed.filter(item=>!isLegacyBuiltInModule(item));
+   if(custom.length){
+    const defaultId=custom.some(i=>i.id===v.defaultId)?v.defaultId:custom[0].id;
+    return {items:custom,defaultId};
+   }
+  }
+ }catch{/* Invalid or unavailable storage falls back to default shared library. */}
+ const items=defaultModuleCatalog();
+ return {items,defaultId:items[0].id};
+}
 export function saveModuleLibrary(value:SavedModuleLibrary,storage?:Storage){const items=parseModuleCatalog(value.items,[]);if(!items.some(i=>i.id===value.defaultId))throw Error(tx('请选择新项目默认组件'));(storage??localStorage).setItem(key,JSON.stringify({items,defaultId:value.defaultId}));}
 export const sameLibraryModule=(a:ModuleCatalogItem,b:ModuleCatalogItem)=>a.name===b.name&&sameModule(a.spec,b.spec);
 

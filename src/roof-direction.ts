@@ -1,5 +1,5 @@
 import {directionMarkerLength} from './direction-marker-style';
-import type {RoofPitch} from './pitched-roof';
+import {rescaleGableSpans,type RoofPitch} from './pitched-roof';
 
 /** A ridge runs perpendicular to the roof's slope axis. */
 export function longRidgeAxis({width,depth}:{width:number;depth:number}):RoofPitch['axis']{
@@ -9,8 +9,16 @@ export function gableRidgeLine(width:number,depth:number,axis:RoofPitch['axis'])
  return axis==='z'?[-width/2,0,width/2,0]:[0,-depth/2,0,depth/2];
 }
 
-export function turnPitch(p:RoofPitch):RoofPitch{
- if(p.kind==='gable')return {...p,axis:p.axis==='x'?'z':'x'};
+export function turnPitch(p:RoofPitch,roof?:{width:number;depth:number}):RoofPitch{
+ if(p.kind==='gable'){
+  const nextAxis:RoofPitch['axis']=p.axis==='x'?'z':'x';
+  if(p.spans&&roof){
+   const oldTotal=p.axis==='x'?roof.width:roof.depth;
+   const newTotal=nextAxis==='x'?roof.width:roof.depth;
+   return {...p,axis:nextAxis,spans:rescaleGableSpans(p.spans,oldTotal,newTotal)};
+  }
+  return {...p,axis:nextAxis};
+ }
  return {...p,axis:p.axis==='x'?'z':'x',high:p.axis==='z'?-p.high as 1|-1:p.high};
 }
 export function pitchSegments(width:number,depth:number,p:RoofPitch):number[][]{

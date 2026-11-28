@@ -9,6 +9,7 @@ import {standardModuleId} from './module-library';
 import {tx} from './i18n';
 export type RoofDesign = {
   northAngle?:number;
+  shadingOnly?:boolean;
   edgeOverride?:number; ridgeEdgeOverride?:number;
   carport?:CarportOptions;
   pitch?:RoofPitch; flatHeight?:number;
@@ -20,7 +21,7 @@ export type RoofDesign = {
 export const newRoof = (name=tx('屋面 1')):RoofDesign => ({id:newId(),name,x:0,z:0,yaw:0,roof:{...defaultRoof},moduleId:standardModuleId,moduleSpec:{...defaultModule},layoutOptions:{portrait:true,tilt:20,edge:.5,gap:1,maxColumns:18,tableRows:1,spacingMode:'solar',rowGap:0},flatHeight:20,wallHeight:1.2,obstacles:[],arrays:[],layoutSignature:'',layoutMessage:'',previous:null});
 // New geometry starts empty; only editable design preferences are inherited.
 export function roofFromPrevious(previous:RoofDesign,name:string):RoofDesign {
- return {...newRoof(name),northAngle:previous.northAngle,moduleId:previous.moduleId,moduleSpec:{...previous.moduleSpec},layoutOptions:{...structuredClone(previous.layoutOptions),layoutArea:undefined,layoutAreaEnabled:undefined},pitch:previous.pitch?{...previous.pitch}:undefined,flatHeight:previous.flatHeight,wallHeight:previous.wallHeight};
+ return {...newRoof(name),northAngle:previous.northAngle,moduleId:previous.moduleId,moduleSpec:{...previous.moduleSpec},layoutOptions:{...structuredClone(previous.layoutOptions),layoutArea:undefined,layoutAreaEnabled:undefined},pitch:previous.pitch?{...previous.pitch,spans:undefined}:undefined,flatHeight:previous.flatHeight,wallHeight:previous.wallHeight};
 }
 export function carportFromPrevious(previous:RoofDesign,name:string):RoofDesign {
  return {...roofFromPrevious(previous,name),pitch:undefined,carport:{...(previous.carport??defaultCarport)},wallHeight:0,moduleId:previous.moduleSpec.kind==='lightweight'?undefined:previous.moduleId,moduleSpec:{...(previous.moduleSpec.kind==='lightweight'?defaultModule:previous.moduleSpec),kind:'standard'}};
@@ -35,7 +36,7 @@ export function worldObstacle(o:Obstacle,r:RoofDesign):Obstacle {
  return {...o,baseHeight:bottom,height:o.height+top-bottom,...toWorld(o,r),id:`${r.id}/${o.id}`,yaw:o.yaw+r.yaw};
 }
 /** Panels, obstacles and roofs in world space for the render window's 3D scenes. Carports keep `carport`, so they are drawn as carports, not as buildings. */
-export const sceneData=(roofs:RoofDesign[])=>({arrays:roofs.flatMap(r=>r.arrays.map(a=>worldArray(a,r))),obstacles:roofs.flatMap(r=>r.obstacles.map(o=>worldObstacle(o,r))),sites:roofs.map(r=>({...roofRect(r),id:r.id,name:r.name,wallHeight:r.wallHeight,pitch:r.pitch,carport:r.carport,flatHeight:r.flatHeight}))});
+export const sceneData=(roofs:RoofDesign[])=>({arrays:roofs.flatMap(r=>r.arrays.map(a=>worldArray(a,r))),obstacles:roofs.flatMap(r=>r.obstacles.map(o=>worldObstacle(o,r))),sites:roofs.map(r=>({...roofRect(r),id:r.id,name:r.name,wallHeight:r.wallHeight,pitch:r.pitch,carport:r.carport,flatHeight:r.flatHeight,shadingOnly:r.shadingOnly}))});
 export function projectBounds(roofs:RoofDesign[]) {
  const points=roofs.flatMap(r=>corners(roofRect(r)));
  if(!points.length)return {x:0,z:0,width:0,depth:0};

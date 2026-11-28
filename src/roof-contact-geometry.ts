@@ -1,9 +1,10 @@
 import {ShapeUtils,Vector2} from 'three';
 import {corners,type Obstacle,type Point,type SceneSite} from './domain';
-import {flatRoofFootprint} from './flat-roof-shell';
+import {flatRoofFootprint,insetRoof} from './flat-roof-shell';
+import {gableOuterLoop,gableSlopeTriangles} from './gable-geometry';
 import {cross,insidePolygon,segmentDistance,signedArea} from './polygon';
 import {roofHeight} from './pitched-roof';
-import {gableParapetPlan,pitchSkinOffset} from './gable-parapet';
+import {gableCopingHeight,gableParapetPlan,pitchSkinOffset} from './gable-parapet';
 import {toLocal} from './roof-project';
 
 const EPS=1e-6;
@@ -52,6 +53,24 @@ export function contactFacadeCuts(outer:Point[],solids:ContactSolid[],top:number
 export function roofContact(site:SceneSite):RoofContact{
  const pitch=site.pitch;
  if(pitch){
+  if(pitch.kind==='gable'&&(site.outline||pitch.spans)){
+   const outer=gableOuterLoop(site);
+   const wall=site.wallHeight>0?site.wallHeight:0;
+   const deck=wall>0?insetRoof(outer,.2).inner:outer;
+   const surface:Height=p=>roofHeight(site,pitch,p.x,p.z)+pitchSkinOffset;
+   const copingHeight=gableCopingHeight(site,pitch,wall);
+   const coping:Height=()=>copingHeight;
+   const slopeTris=gableSlopeTriangles(site,pitch,wall>0).map(item=>item.triangle);
+   const split=slopeTris;
+   const patches=[
+    ...slopeTris.map(triangle=>({triangle,height:surface})),
+    ...(wall>0?triangles(outer,[deck]).map(triangle=>({triangle,height:coping})):[]),
+   ];
+   return {outer,deck,split,surface,patches,occupied:p=>{
+    if(!insidePolygon(p,outer)&&!onLoop(p,outer))return;
+    return wall>0&&(!insidePolygon(p,deck)||onLoop(p,deck))?coping:surface;
+   }};
+  }
   if(pitch.kind==='gable'&&site.wallHeight>0){
    const {outer,deck,cells,surface,coping}=gableParapetPlan(site,pitch,site.wallHeight);
    const split=cells.filter(cell=>cell.deck).map(cell=>cell.outline);

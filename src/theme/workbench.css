@@ -383,6 +383,30 @@ input[type=checkbox],input[type=radio],input[type=range]{accent-color:var(--pv-a
 .region-type-menu>div{padding-left:12px;display:grid;gap:2px}
 .region-context-header .region-menu-items.region-new-menu{left:auto;right:calc(var(--pv-inspector-inset) + var(--pv-inspector-scrollbar));min-width:168px}
 .region-new-menu button:focus-visible{outline:0;background:var(--pv-surface-slot);box-shadow:inset 0 0 0 1px var(--pv-border-strong)}
+.region-new-more{margin-top:2px;padding-top:2px;border-top:1px solid var(--pv-border);display:grid;gap:2px}
+.region-new-more-trigger{width:100%;color:var(--pv-text-secondary)!important}
+.region-new-more-trigger>[data-icon="chevron"]{margin-left:auto;transition:transform var(--pv-duration-fast)}
+.region-new-more-trigger[aria-expanded="true"]>[data-icon="chevron"]{transform:rotate(180deg)}
+.region-new-more-items{padding-left:10px;display:grid;gap:2px}
+.shading-badge{padding:1px 6px;border-radius:4px;background:var(--pv-surface-slot);border:1px solid var(--pv-border);font-size:11px;font-weight:500;color:var(--pv-text-secondary)}
+.shading-only-layout-notice{display:flex;flex-direction:column;gap:10px;padding:14px 12px;border-radius:8px;background:var(--pv-surface-slot);border:1px solid var(--pv-border);color:var(--pv-text-secondary);font-size:12.5px;line-height:1.5}
+.shading-only-layout-notice p{margin:0}
+.multi-gable-controls{display:flex;flex-direction:column;gap:6px;padding-top:8px;border-top:1px solid var(--pv-border)}
+.multi-gable-header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.multi-gable-title{font-size:12px;font-weight:600;color:var(--pv-text-secondary);display:flex;align-items:center;gap:4px}
+.multi-gable-title small{font-family:var(--pv-font-mono);font-weight:500;color:var(--pv-text-tertiary)}
+.multi-gable-cut-btn{height:26px;padding:0 8px;border:1px solid var(--pv-border);border-radius:5px;background:var(--pv-surface-slot);color:var(--pv-accent);font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:4px}
+.multi-gable-cut-btn:hover:not(:disabled){background:var(--pv-accent-soft);border-color:var(--pv-accent-border)}
+.multi-gable-cut-btn .ui-icon[data-icon]{width:14px!important;height:14px!important}
+.multi-gable-spans{display:flex;flex-direction:column;gap:4px}
+.multi-gable-span-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 8px;border:1px solid var(--pv-border);border-radius:6px;background:var(--pv-surface)}
+.multi-gable-span-row.is-highlighted{border-color:#0d9488;background:rgba(13,148,136,.07)}
+.multi-gable-span-meta{display:flex;flex-direction:column;gap:1px;min-width:0}
+.multi-gable-span-meta strong{font-size:12px;font-weight:600;color:var(--pv-text)}
+.multi-gable-span-meta span{font-family:var(--pv-font-mono);font-size:11px;color:var(--pv-text-tertiary);white-space:nowrap}
+.multi-gable-span-slope{display:inline-flex;align-items:center;gap:4px;margin:0;flex-shrink:0}
+.multi-gable-span-slope input{width:54px!important;height:24px!important;padding:0 5px!important;border:1px solid var(--pv-border)!important;border-radius:4px!important;background:var(--pv-surface)!important;font-family:var(--pv-font-mono);font-size:12px!important;text-align:right;margin:0!important}
+.multi-gable-span-slope span{font-family:var(--pv-font-mono);font-size:11px;color:var(--pv-text-tertiary)}
 .region-menu-group>span{padding:2px 8px;font-size:11px;font-weight:600;color:var(--pv-text-tertiary)}
 
 .region-empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:36px 16px;color:var(--pv-text-tertiary);font-size:12.5px;text-align:center}
@@ -703,9 +727,6 @@ input[type=checkbox],input[type=radio],input[type=range]{accent-color:var(--pv-a
 @container workbench-viewport (max-width:360px){
  .workspace-forma .viewport .viewport-tools.canvas-island{height:auto;flex-wrap:wrap;justify-content:center}
 }
-
-.grouped-drawing-tools:has(.drawing-right-hint){overflow:visible}
-.drawing-right-hint{position:absolute;left:calc(100% + 6px);bottom:41px;white-space:nowrap;font:12px/20px var(--pv-font-sans);padding:0 6px;border-radius:4px;background:var(--pv-surface);color:var(--pv-text-secondary);pointer-events:none;box-shadow:var(--pv-shadow-float)}
 
 /* Layout inspector shares the region inspector's typography and row rhythm. */
 .layout-inspector{--layout-value-width:88px;font-family:var(--pv-font-sans)}

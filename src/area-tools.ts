@@ -16,13 +16,14 @@ function extent(r:Rect,frame:Pick<RoofDesign,'x'|'z'|'yaw'>){
  return {x0:Math.min(...xs),x1:Math.max(...xs),z0:Math.min(...zs),z1:Math.max(...zs)};
 }
 /** New position of `moving` with one edge, centre line or angle lined up with `target`. Measured along the target's own axes turned by whole quarter turns to sit closest to the screen's, so "left" is always the side nearest screen left. Panels and objects ride along. */
-export function alignRoof(moving:RoofDesign,target:RoofDesign,edge:AlignEdge):Pick<RoofDesign,'x'|'z'|'yaw'>{
- return alignRect(roofRect(moving),roofRect(target),edge);
+export function alignRoof(moving:RoofDesign,target:RoofDesign,edge:AlignEdge,viewRotation=0):Pick<RoofDesign,'x'|'z'|'yaw'>{
+ return alignRect(roofRect(moving),roofRect(target),edge,viewRotation);
 }
 /** The same for any two rects in one frame (areas in the world, or objects in their area). */
-export function alignRect(moving:Rect,target:Rect,edge:AlignEdge):{x:number;z:number;yaw:number}{
+export function alignRect(moving:Rect,target:Rect,edge:AlignEdge,viewRotation=0):{x:number;z:number;yaw:number}{
  if(edge==='angle')return {x:moving.x,z:moving.z,yaw:target.yaw};
- const frame={x:target.x,z:target.z,yaw:target.yaw-Math.round(target.yaw/(Math.PI/2))*Math.PI/2};
+ const base=viewRotation*Math.PI/180,rel=target.yaw-base;
+ const frame={x:target.x,z:target.z,yaw:base+rel-Math.round(rel/(Math.PI/2))*Math.PI/2};
  const m=extent(moving,frame),t=extent(target,frame);
  const dx=edge==='left'?t.x0-m.x0:edge==='right'?t.x1-m.x1:edge==='middle'?(t.x0+t.x1-m.x0-m.x1)/2:0;
  const dz=edge==='top'?t.z0-m.z0:edge==='bottom'?t.z1-m.z1:edge==='center'?(t.z0+t.z1-m.z0-m.z1)/2:0;

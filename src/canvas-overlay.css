@@ -6,6 +6,7 @@
 .leg-annex,.swatch.annex{background:var(--legend-annex-fill);border:1px solid var(--legend-annex-edge)}
 .leg-obstacle,.swatch.obstacle{background:var(--legend-obstacle-fill);border:1px solid var(--legend-obstacle-edge)}
 .leg-keepout,.swatch.keepout{background:color-mix(in srgb,var(--legend-keepout-fill) 20%,#f9fafb);border:1px solid color-mix(in srgb,var(--legend-keepout-edge) 40%,#f9fafb)}
+.leg-shading,.swatch.shading{background:var(--legend-shading-fill);border:1px solid var(--legend-shading-edge)}
 .canvas-legend{position:relative;pointer-events:auto;margin-left:2px;padding-left:10px;border-left:1px solid var(--pv-border)}
 .canvas-legend summary{list-style:none;cursor:pointer;color:#4e5662;font-weight:500;font-size:11px}
 .canvas-legend summary::-webkit-details-marker{display:none}

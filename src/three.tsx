@@ -5,6 +5,7 @@ import {FootprintGeometry,footprintLines} from './footprint-mesh';
 import {arrayLocationDimensions} from './array-dimensions';
 import { CarportSupports } from './carport-supports';
 import {gableRidgeLine,pitchSegments,carportColumnEdge} from './roof-direction';
+import {gablePlanLines,gableSpanHighlightPositions} from './gable-geometry';
 import {canvasColours,useColourBlind} from './colour-vision';
 import {fitOrbitView,fitPlanImage} from './viewport-fit';
 import {layoutMarkerBadge,type LayoutMarker} from './layout-direction';
@@ -99,12 +100,14 @@ function SiteTag({number,carport,capacity,position,unit,selected,badgeOnLeft}:{
  return <sprite position={position} scale={[unit*width,unit*PLAN_TAG_HEIGHT,1]} renderOrder={11000}><spriteMaterial map={texture} toneMapped={false} transparent depthTest={false} depthWrite={false}/></sprite>;
 }
 type PlanView={x:number;z:number;span:number};
-function PlanSiteLabels({sites,referenceSites,selectedId,pickedIds,view,fitView,width,height}:{
- sites:SceneSite[];referenceSites:SceneSite[];selectedId?:string;pickedIds?:string[];view:PlanView;fitView:PlanView;width:number;height:number;
+function PlanSiteLabels({sites,referenceSites,selectedId,pickedIds,view,fitView,width,height,viewRotation=0}:{
+ sites:SceneSite[];referenceSites:SceneSite[];selectedId?:string;pickedIds?:string[];view:PlanView;fitView:PlanView;width:number;height:number;viewRotation?:number;
 }){
+ const visibleSites=useMemo(()=>sites.filter(s=>!s.shadingOnly),[sites]);
+ const visibleRef=useMemo(()=>referenceSites.filter(s=>!s.shadingOnly),[referenceSites]);
  const tags=useMemo(()=>{
   const ctx=document.createElement('canvas').getContext('2d')!;
-  return sites.map((site,index)=>{
+  return visibleSites.map((site,index)=>{
    const number=String(site.planNumber??index+1).padStart(2,'0');
    const carport=!!site.carport,capacity=site.capacity&&site.capacity>0?site.capacity.toFixed(1)+' kWp':'';
    const selected=selectedId===site.id||!!pickedIds?.includes(site.id);
@@ -113,25 +116,33 @@ function PlanSiteLabels({sites,referenceSites,selectedId,pickedIds,view,fitView,
    if(capacity)sizes.unshift({width,height:PLAN_TAG_HEIGHT,minRoofSize:64,withCapacity:true});
    return {id:site.id,number,carport,capacity,selected,sizes,outline:corners(site)};
   });
- },[sites,selectedId,pickedIds]);
+ },[visibleSites,selectedId,pickedIds]);
  const {x:fitX,z:fitZ,span:fitSpan}=fitView;
+ const rad=viewRotation*Math.PI/180,cos=Math.cos(rad),sin=Math.sin(rad);
+ const toScreen=(p:{x:number;z:number},origin:{x:number;z:number},unit:number)=>({
+  x:((p.x-origin.x)*cos-(p.z-origin.z)*sin)/unit+width/2,
+  z:((p.x-origin.x)*sin+(p.z-origin.z)*cos)/unit+height/2,
+ });
  const preferred=useMemo(()=>{
   if(!width||!height)return new Map();
   const unit=fitSpan/height;
-  const projected=referenceSites.map(site=>{
-   const outline=corners(site).map(p=>({x:(p.x-fitX)/unit+width/2,z:(p.z-fitZ)/unit+height/2}));
+  const projected=visibleRef.map(site=>{
+   const outline=corners(site).map(p=>toScreen(p,{x:fitX,z:fitZ},unit));
    return {id:site.id,outline,selected:false,sizes:[{width:PLAN_TAG_HEIGHT,height:PLAN_TAG_HEIGHT,minRoofSize:4,withCapacity:false}]};
   });
   return new Map(placePlanLabels(projected,width,height).map(label=>[label.id,label.side]));
- },[referenceSites,fitX,fitZ,fitSpan,width,height]);
+ },[visibleRef,fitX,fitZ,fitSpan,width,height,viewRotation]);
  if(!width||!height)return null;
  const unit=view.span/height;
- const projected=tags.map(tag=>({...tag,outline:tag.outline.map(p=>({x:(p.x-view.x)/unit+width/2,z:(p.z-view.z)/unit+height/2}))}));
+ const projected=tags.map(tag=>({...tag,outline:tag.outline.map(p=>toScreen(p,view,unit))}));
  const byId=new Map(tags.map(tag=>[tag.id,tag]));
- const center={x:(fitX-view.x)/unit+width/2,z:(fitZ-view.z)/unit+height/2};
+ const center=toScreen({x:fitX,z:fitZ},view,unit);
  return placePlanLabels(projected,width,height,preferred,center).map(label=>{
   const tag=byId.get(label.id)!;
-  const world=(p:{x:number;z:number}):[number,number,number]=>[view.x+(p.x-width/2)*unit,.6,view.z+(p.z-height/2)*unit];
+  const world=(p:{x:number;z:number}):[number,number,number]=>{
+   const ox=(p.x-width/2)*unit,oy=(p.z-height/2)*unit;
+   return [view.x+ox*cos+oy*sin,.6,view.z-ox*sin+oy*cos];
+  };
   return <group key={tag.id}>
    <Lines points={label.leader.flatMap(world)} color="#737e86" opacity={tag.selected?.52:.35} depthTest={false} order={10980}/>
    <SiteTag number={tag.number} carport={tag.carport} capacity={label.size.withCapacity?tag.capacity:''} selected={tag.selected} position={world(label.center)} unit={unit} badgeOnLeft={label.side==='left'}/>
@@ -146,7 +157,7 @@ function CadDimensionText({text,position,unit,angle}:{text:string;position:[numb
  if(Math.abs(rotation+Math.PI/2)<.001)rotation=Math.PI/2;
  return <sprite position={position} scale={[unit*width/4,unit*18,1]} renderOrder={11000}><spriteMaterial rotation={rotation} map={texture} toneMapped={false} transparent depthTest={false} depthWrite={false}/></sprite>;
 }
-function ArrayLocationDimensions({array,site,unit}:{array:PVArray;site:import('./domain').SceneSite;unit:number}){
+function ArrayLocationDimensions({array,site,unit,viewRotation=0}:{array:PVArray;site:import('./domain').SceneSite;unit:number;viewRotation?:number}){
  const {origin:o,anchor:a,x,z}=arrayLocationDimensions(array,site),offset=unit*36,tick=unit*3,top=o.z-offset,left=o.x-offset,gap=unit*3,over=unit*6;
  const segments:number[]=[];
  const line=(x1:number,z1:number,x2:number,z2:number)=>segments.push(x1,.5,z1,x2,.5,z2);
@@ -157,11 +168,12 @@ function ArrayLocationDimensions({array,site,unit}:{array:PVArray;site:import('.
  // Extension lines start clear of the measured geometry, and overrun dimension lines.
  line(o.x,o.z-gap,o.x,top-over);line(a.x,a.z-gap,a.x,top-over);
  line(o.x-gap,o.z,left-over,o.z);line(a.x-gap,a.z,left-over,a.z);
+ const viewRad=viewRotation*Math.PI/180;
  return <group name="array-location-dimensions" position={[site.x,0,site.z]} rotation={[0,site.yaw,0]}>
   <lineSegments renderOrder={10990}><bufferGeometry><bufferAttribute attach="attributes-position" args={[new Float32Array(segments),3]}/></bufferGeometry><lineBasicMaterial color="#58656c" depthTest={false} depthWrite={false} toneMapped={false}/></lineSegments>
   {[[o.x,top],[a.x,top],[left,o.z],[left,a.z]].map(([cx,cz],i)=><mesh key={i} position={[cx,.55,cz]} rotation={[0,Math.PI/4,0]} renderOrder={10995}><boxGeometry args={[tick*2.83,.01,unit*1.6]}/><meshBasicMaterial color="#27343b" depthTest={false} depthWrite={false} toneMapped={false}/></mesh>)}
-  <CadDimensionText text={x.toFixed(2)} position={[txPos,.6,top-unit*12]} unit={unit} angle={site.yaw}/>
-  <CadDimensionText text={z.toFixed(2)} position={[left-unit*12,.6,tzPos]} unit={unit} angle={site.yaw+Math.PI/2}/>
+  <CadDimensionText text={x.toFixed(2)} position={[txPos,.6,top-unit*12]} unit={unit} angle={site.yaw-viewRad}/>
+  <CadDimensionText text={z.toFixed(2)} position={[left-unit*12,.6,tzPos]} unit={unit} angle={site.yaw-viewRad+Math.PI/2}/>
  </group>;
 }
 
@@ -254,7 +266,7 @@ function Lines({
       <bufferGeometry>
         <bufferAttribute attach="attributes-position" args={[data, 3]} />
       </bufferGeometry>
-      <lineBasicMaterial color={color} transparent={opacity<1} opacity={opacity} depthTest={depthTest} depthWrite={false} toneMapped={false}/>
+      <lineBasicMaterial key={opacity<1?'t':'o'} color={color} transparent={opacity<1} opacity={opacity} depthTest={depthTest} depthWrite={false} toneMapped={false}/>
     </Tag>
   );
 }
@@ -297,7 +309,7 @@ function makeTopCells(){
  const map=new THREE.CanvasTexture(canvas);map.colorSpace=THREE.SRGBColorSpace;map.anisotropy=4;
  return map;
 }
-function TopArray({a,selected,conflict,map}:{a:PVArray;selected:boolean;conflict:boolean;map:THREE.Texture}) {
+function TopArray({a,selected,conflict,map,faded=false}:{a:PVArray;selected:boolean;conflict:boolean;map:THREE.Texture;faded?:boolean}) {
  const g=useMemo(()=>geometry(a),[a]),c=canvasColours(useColourBlind());
  const data=useMemo(()=>{
   const fill:number[]=[],edges:number[]=[],uv:number[]=[];
@@ -313,9 +325,9 @@ function TopArray({a,selected,conflict,map}:{a:PVArray;selected:boolean;conflict
   return {fill:new Float32Array(fill),uv:new Float32Array(uv),edges};
  },[a,g]);
  return <group position={[a.x,0,a.z]} rotation={[0,g.yaw,0]}>
-  <mesh userData={{arrayId:a.id}}><bufferGeometry><bufferAttribute attach="attributes-position" args={[data.fill,3]}/><bufferAttribute attach="attributes-uv" args={[data.uv,2]}/></bufferGeometry><meshBasicMaterial map={map} color={conflict?c.conflictFill:selected?'#cbd5e1':'#ffffff'} toneMapped={false}/></mesh>
-  <Lines points={data.edges} segments color={conflict?c.conflictEdge:selected?'#475569':'#64748b'}/>
-  <Lines points={outline(g.width,g.depth,.22)} color={conflict?c.conflictLine:selected?'#18191c':'#94a3b8'}/>
+  <mesh userData={{arrayId:a.id}}><bufferGeometry><bufferAttribute attach="attributes-position" args={[data.fill,3]}/><bufferAttribute attach="attributes-uv" args={[data.uv,2]}/></bufferGeometry><meshBasicMaterial key={faded?'faded':'solid'} map={map} color={conflict?c.conflictFill:selected?'#cbd5e1':'#ffffff'} transparent={faded} opacity={faded?.22:1} depthWrite={!faded} toneMapped={false}/></mesh>
+  <Lines points={data.edges} segments color={conflict?c.conflictEdge:selected?'#475569':'#64748b'} opacity={faded?.25:1}/>
+  <Lines points={outline(g.width,g.depth,.22)} color={conflict?c.conflictLine:selected?'#18191c':'#94a3b8'} opacity={faded?.35:1}/>
  </group>;
 }
 function ArrayMesh({
@@ -370,7 +382,7 @@ function ArrayMesh({
   );
 }
 function Scene(input: ViewProps) {
-  const [clean,setClean]=useState<LayoutImageOptions&{planView?:PlanView}>();
+  const [clean,setClean]=useState<LayoutImageOptions&{planView?:PlanView;exportRotation?:number}>();
   const exportSiteId=clean?.siteId;
   const belongsToSite=(item:{id:string})=>item.id.startsWith(exportSiteId+'/');
   const props=clean?{
@@ -416,6 +428,8 @@ function Scene(input: ViewProps) {
       const liveCamera=get().camera;
       let captureCamera=liveCamera;
       let exportPlanView:PlanView|undefined;
+      const exportRotation=liveCamera instanceof THREE.OrthographicCamera?(options.orientation==='current'?(current.viewRotation??0):0):0;
+      const exportRad=exportRotation*Math.PI/180;
       if(options.scope!=='screen'){
         const siteId=options.scope==='site'?options.siteId:undefined;
         const exportSites=(current.sites??[]).filter(site=>!siteId||site.id===siteId);
@@ -423,13 +437,13 @@ function Scene(input: ViewProps) {
         const exportObstacles=(current.obstacles??[]).filter(item=>!siteId||item.id.startsWith(siteId+'/'));
         const aspect=width/height;
         if(liveCamera instanceof THREE.OrthographicCamera){
-          exportPlanView=fitPlanImage(aspect,exportSites,exportObstacles,exportArrays);
+          exportPlanView=fitPlanImage(aspect,exportSites,exportObstacles,exportArrays,exportRotation);
           if(exportPlanView){
             const {x,z,span}=exportPlanView;
             const camera=liveCamera.clone();
             camera.left=-span*aspect/2;camera.right=span*aspect/2;
             camera.top=span/2;camera.bottom=-span/2;
-            camera.position.set(x,400,z);camera.lookAt(x,0,z);
+            camera.position.set(x,400,z);camera.up.set(-Math.sin(exportRad),0,-Math.cos(exportRad));camera.lookAt(x,0,z);
             captureCamera=camera;
           }
         }else if(liveCamera instanceof THREE.PerspectiveCamera){
@@ -442,9 +456,14 @@ function Scene(input: ViewProps) {
         }
         captureCamera.updateProjectionMatrix();
         captureCamera.updateMatrixWorld();
+      }else if(liveCamera instanceof THREE.OrthographicCamera&&Math.abs((current.viewRotation??0)-exportRotation)>1e-6){
+        const camera=liveCamera.clone(),v=topView.current;
+        camera.position.set(v.x,400,v.z);camera.up.set(-Math.sin(exportRad),0,-Math.cos(exportRad));camera.lookAt(v.x,0,v.z);
+        camera.updateProjectionMatrix();camera.updateMatrixWorld();
+        captureCamera=camera;
       }
       try{
-        flushSync(()=>setClean({...options,planView:exportPlanView}));
+        flushSync(()=>setClean({...options,planView:exportPlanView,exportRotation}));
         const base=latest.current.baseImage;
         if(latest.current.mode==='top'&&options.includeBase&&base?.frame&&base.metersPerPixel&&!base.blank&&!scene.getObjectByName('plan-base-raster')?.visible){
           throw new Error(tx('底图正在加载，请稍后再试'));
@@ -500,6 +519,7 @@ function Scene(input: ViewProps) {
     const aspect=width/height;
     if (active === cameras.top) {
       const {x,z,span}=v;
+      const rad=(latest.current.viewRotation??0)*Math.PI/180,cos=Math.cos(rad),sin=Math.sin(rad);
       setPlanView(previous=>previous.x===x&&previous.z===z&&previous.span===span?previous:{x,z,span});
       const c = cameras.top;
       c.left = -span*aspect/2;
@@ -507,11 +527,18 @@ function Scene(input: ViewProps) {
       c.top = v.span / 2;
       c.bottom = -v.span / 2;
       c.position.set(v.x, 400, v.z);
-      c.up.set(0, 0, -1);
+      c.up.set(-sin, 0, -cos);
       latest.current.onScale?.(v.span/height);
       const base=latest.current.baseImage;
-      if(base?.frame&&base.metersPerPixel){const f=base.frame,k=base.metersPerPixel;const next={x:(v.x+c.left)/k+f.x+f.width/2,y:(v.z-c.top)/k+f.y+f.height/2,width:(c.right-c.left)/k,height:v.span/k};latest.current.onDrawingView?.({...next,viewportHeight:height});setPdfView(old=>Math.abs(old.x-next.x)+Math.abs(old.y-next.y)+Math.abs(old.width-next.width)+Math.abs(old.height-next.height)<1e-6?old:next);}
-
+      if(base?.frame&&base.metersPerPixel){
+        const f=base.frame,k=base.metersPerPixel;
+        const next={x:(v.x+c.left)/k+f.x+f.width/2,y:(v.z-c.top)/k+f.y+f.height/2,width:(c.right-c.left)/k,height:v.span/k};
+        latest.current.onDrawingView?.({...next,viewportHeight:height});
+        const hw=span*aspect/2,hh=span/2;
+        const wx=hw*Math.abs(cos)+hh*Math.abs(sin),wz=hw*Math.abs(sin)+hh*Math.abs(cos);
+        const pdfBox={x:(v.x-wx)/k+f.x+f.width/2,y:(v.z-wz)/k+f.y+f.height/2,width:2*wx/k,height:2*wz/k};
+        setPdfView(old=>Math.abs(old.x-pdfBox.x)+Math.abs(old.y-pdfBox.y)+Math.abs(old.width-pdfBox.width)+Math.abs(old.height-pdfBox.height)<1e-6?old:pdfBox);
+      }
     } else {
       cameras.perspective.near = stress ? 2 : latest.current.eyeLevel ? 0.3 : 0.8;
       cameras.perspective.far=Math.max(1500,v.distance*3);
@@ -538,17 +565,21 @@ function Scene(input: ViewProps) {
   useLayoutEffect(() => {
     set({ camera: active });
     fit();
-  }, [active, size.width, size.height]);
+  }, [active, size.width, size.height, props.viewRotation]);
   const framePlan=(aspect:number)=>{
     const plan=topView.current;
-    Object.assign(plan,fittedPlanView(props.focus,roof,aspect));
+    const rotation=props.viewRotation??0;
+    const rotatedFit=rotation?fitPlanImage(aspect,props.sites??[],props.obstacles??[],props.arrays,rotation):undefined;
+    Object.assign(plan,rotatedFit??fittedPlanView(props.focus,roof,aspect));
     const base=props.baseImage;
     if(base?.metersPerPixel&&!props.sites?.length&&!base.blank){
       const k=base.metersPerPixel,f=base.frame??{x:0,y:0,width:base.width,height:base.height};
       const left=Math.min((-f.x-f.width/2)*k,(props.focus?.x??0)-roof.width/2),right=Math.max((base.width-f.x-f.width/2)*k,(props.focus?.x??0)+roof.width/2);
       const top=Math.min((-f.y-f.height/2)*k,(props.focus?.z??0)-roof.depth/2),bottom=Math.max((base.height-f.y-f.height/2)*k,(props.focus?.z??0)+roof.depth/2);
       plan.x=(left+right)/2;plan.z=(top+bottom)/2;
-      plan.span=Math.max((bottom-top)*1.06,(right-left)*1.06/aspect,10);
+      const rad=rotation*Math.PI/180,c=Math.abs(Math.cos(rad)),s=Math.abs(Math.sin(rad));
+      const w=right-left,d=bottom-top;
+      plan.span=Math.max((w*s+d*c)*1.06,(w*c+d*s)*1.06/aspect,10);
     }
   };
   useLayoutEffect(() => {
@@ -787,6 +818,8 @@ function Scene(input: ViewProps) {
   }, [active, gl, scene, props.reset, stress]);
   const selectedObjSet=useMemo(()=>new Set([...(props.selectedObjectId?[props.selectedObjectId]:[]),...(props.pickedObjectIds??[]),...(props.selectedObjectIds??[])]),[props.selectedObjectId,props.pickedObjectIds,props.selectedObjectIds]);
   const selectedObjList=useMemo(()=>[...selectedObjSet],[selectedObjSet]);
+  const drawing=props.mode==='top'&&!!props.drawingMode&&!clean;
+  const effectiveRotation=clean?(clean.exportRotation??0):(props.viewRotation??0);
   return (
     <>
       {detailed ? (
@@ -797,11 +830,11 @@ function Scene(input: ViewProps) {
           <ambientLight intensity={1.4} />
           <directionalLight position={[-10, 25, -15]} intensity={2} />
           {props.mode==='top'&&!stress&&props.showGrid!==false&&<PlanGrid center={{x:props.focus?.x??0,z:props.focus?.z??0}}/>}
-          {sites.filter(r=>!r.carport||props.mode==='top'&&!clean).map(r=>r.pitch&&props.mode!=="top"?<group key={r.id} position={[r.x,0,r.z]} rotation={[0,r.yaw,0]}><PitchedMesh site={r} maquette/></group>:<group key={r.id} position={[r.x,0,r.z]} rotation={[0,r.yaw,0]}>{props.mode==='top'&&!showPlanBase&&<mesh position={[0.35,-0.25,0.55]} rotation={[-Math.PI/2,0,0]}><FootprintGeometry roof={r} plane/><meshBasicMaterial color="#d6dbe2" depthWrite={false} toneMapped={false}/></mesh>}<mesh position={[0,props.mode==='top'?-.15:(r.flatHeight??3.5)/2-3.5,0]}><FootprintGeometry roof={r} height={props.mode==='top'?.3:(r.flatHeight??3.5)}/><meshBasicMaterial color={props.mode==='top'?canvasStyle.planRoof:'#e8ecf1'} toneMapped={false}/></mesh></group>)}
+          {!drawing&&sites.filter(r=>!r.carport||props.mode==='top'&&!clean).map(r=>r.pitch&&props.mode!=="top"?<group key={r.id} position={[r.x,0,r.z]} rotation={[0,r.yaw,0]}><PitchedMesh site={r} maquette/></group>:<group key={r.id} position={[r.x,0,r.z]} rotation={[0,r.yaw,0]}>{props.mode==='top'&&!showPlanBase&&<mesh position={[0.35,-0.25,0.55]} rotation={[-Math.PI/2,0,0]}><FootprintGeometry roof={r} plane/><meshBasicMaterial color="#d6dbe2" depthWrite={false} toneMapped={false}/></mesh>}<mesh position={[0,props.mode==='top'?-.15:(r.flatHeight??3.5)/2-3.5,0]}><FootprintGeometry roof={r} height={props.mode==='top'?.3:(r.flatHeight??3.5)}/><meshBasicMaterial color={props.mode==='top'?(r.shadingOnly?canvasStyle.planShadingRoof:canvasStyle.planRoof):(r.shadingOnly?canvasStyle.maquetteShadingRoof:'#e8ecf1')} toneMapped={false}/></mesh></group>)}
         </>
       )}
       {!stress&&props.mode==='top'&&sites.filter(r=>r.id===props.selectedSiteId&&r.layoutArea?.length).map(r=><group key={`layout-area-${r.id}`} position={[r.x,0,r.z]} rotation={[0,r.yaw,0]}><lineLoop renderOrder={10900}><bufferGeometry><bufferAttribute attach="attributes-position" args={[new Float32Array(r.layoutArea!.flatMap(p=>[p.x,.6,p.z])),3]}/></bufferGeometry><lineBasicMaterial color="#77968b" transparent opacity={.6} depthTest={false} depthWrite={false} toneMapped={false}/></lineLoop></group>)}
-      {!stress&&props.mode==='top'&&props.visual?.arrayDimensions&&(()=>{const a=props.arrays.find(a=>a.id===props.selectedId),site=sites.find(r=>a?.id.startsWith(r.id+'/'));return a&&site?<ArrayLocationDimensions array={a} site={site} unit={view.current.span/size.height}/>:null;})()}
+      {!stress&&props.mode==='top'&&props.visual?.arrayDimensions&&(()=>{const a=props.arrays.find(a=>a.id===props.selectedId),site=sites.find(r=>a?.id.startsWith(r.id+'/'));return a&&site?<ArrayLocationDimensions array={a} site={site} unit={view.current.span/size.height} viewRotation={effectiveRotation}/>:null;})()}
       {!stress&&props.mode==='top'&&<>{sites.filter(r=>r.id===props.selectedSiteId||props.pickedSiteIds?.includes(r.id)).map(r=><group key={'selected'+r.id} position={[r.x,0,r.z]} rotation={[0,r.yaw,0]}><Band points={footprintLines(r,.12)} width={view.current.span/size.height*5} color="#ffffff" order={11000}/><Band points={footprintLines(r,.13)} width={view.current.span/size.height*2.4} color="#26292e" order={11001}/></group>)}{obstacles.filter(o=>selectedObjSet.has(o.id)).map(o=><group key={'selected'+o.id} position={[o.x,0,o.z]} rotation={[0,o.yaw,0]}>
         <mesh position={[0,.72,0]} rotation={[-Math.PI/2,0,0]} renderOrder={10950}>
           <planeGeometry args={[o.width,o.depth]}/>
@@ -810,18 +843,26 @@ function Scene(input: ViewProps) {
         <Band points={outline(o.width,o.depth,.72)} width={view.current.span/size.height*5} color="#ffffff" order={11002}/>
         <Band points={outline(o.width,o.depth,.73)} width={view.current.span/size.height*2.5} color={canvasStyle.planObjectSelectedEdge} order={11003}/>
       </group>)}</>}
-      {!stress&&props.mode==='top'&&props.showSiteLabels!==false&&<PlanSiteLabels sites={sites} referenceSites={clean?sites:input.sites??sites} selectedId={props.selectedSiteId} pickedIds={props.pickedSiteIds} view={clean?.planView??planView} fitView={clean?.planView??fittedPlanView(input.focus,roof,size.width/Math.max(1,size.height))} width={size.width} height={size.height}/>}
+      {!stress&&props.mode==='top'&&props.showSiteLabels!==false&&<PlanSiteLabels sites={sites} referenceSites={clean?sites:input.sites??sites} selectedId={props.selectedSiteId} pickedIds={props.pickedSiteIds} view={clean?.planView??planView} fitView={clean?.planView??fittedPlanView(input.focus,roof,size.width/Math.max(1,size.height))} width={size.width} height={size.height} viewRotation={effectiveRotation}/>}
       {!stress && props.mode === "top" && hasRaster && base && <Suspense fallback={null}><BaseImagePlane base={base} view={pdfView} pixels={base.visible!==false&&base.opacity!==0?size.width:0} visible={showRaster} opacity={(clean&&base.opacity===0?1:base.opacity)??1}/></Suspense>}
       {!stress&&props.mode==='3d'&&!!props.winterCheck?.length&&<WinterCheckOutline points={props.winterCheck}/>}
       {/* Engineering exclusion polygons belong to the plan; 3D receives actual light shadows. */}
-      {!stress && props.mode==='top' && props.shadowZones?.map(zone => <ShadowPolygon key={zone.id} overlay points={zone.points} elevation={0} />)}
+      {!stress && !drawing && props.mode==='top' && props.shadowZones?.map(zone => <ShadowPolygon key={zone.id} overlay points={zone.points} elevation={0} />)}
       {showGuides && (
         <>
-          {sites.filter(r=>!clean||!r.carport).map(r=><group key={r.id} position={[r.x,0,r.z]} rotation={[0,r.yaw,0]}>{props.mode==='top'&&(!clean?props.baseImage:showPlanBase)&&<mesh position={[0,.035,0]} rotation={[-Math.PI/2,0,0]}><FootprintGeometry roof={r} plane/><meshBasicMaterial color="#ffffff" transparent opacity={.65} depthWrite={false} toneMapped={false}/></mesh>}<Lines points={footprintLines(r,.025)} color="#94a3b8"/>{r.pitch&&(()=>{
+          {sites.filter(r=>(!clean||!r.carport)&&(!drawing||r.id!==props.editingSiteId)).map(r=><group key={r.id} position={[r.x,0,r.z]} rotation={[0,r.yaw,0]}>{props.mode==='top'&&(drawing||(!clean?props.baseImage:showPlanBase))&&<mesh position={[0,.035,0]} rotation={[-Math.PI/2,0,0]}><FootprintGeometry roof={r} plane/><meshBasicMaterial color={drawing?(r.shadingOnly?canvasStyle.planShadingRoof:'#1478db'):(r.shadingOnly?canvasStyle.planShadingRoof:'#ffffff')} transparent opacity={drawing?(r.shadingOnly?.18:.10):(r.shadingOnly?.78:.65)} depthWrite={false} toneMapped={false}/></mesh>}<Lines points={footprintLines(r,.025)} color={drawing?(r.shadingOnly?canvasStyle.planShadingEdge:'#3b6998'):(r.shadingOnly?canvasStyle.planShadingEdge:'#94a3b8')}/>{r.pitch&&(()=>{
             const p=r.pitch;
             if(p.kind==='gable'){
-              const [x,z,bx,bz]=gableRidgeLine(r.width,r.depth,p.axis);
-              return <Lines points={[x,.04,z,bx,.04,bz]} color={canvasStyle.planRidge} opacity={.68}/>;
+              const {ridges,gutters}=gablePlanLines(r,p);
+              const ridgePts=ridges.flatMap(([a,b])=>[a.x,.065,a.z,b.x,.065,b.z]);
+              const gutterPts=gutters.flatMap(([a,b])=>[a.x,.062,a.z,b.x,.062,b.z]);
+              const highlight=props.mode==='top'&&!drawing&&!clean&&r.id===props.selectedSiteId&&props.highlightedSpanIndex!=null&&p.spans&&props.highlightedSpanIndex>=0&&props.highlightedSpanIndex<p.spans.length
+                ?gableSpanHighlightPositions(r,p,props.highlightedSpanIndex,.055):[];
+              return <>
+                {highlight.length>0&&<mesh renderOrder={10050}><bufferGeometry><bufferAttribute attach="attributes-position" args={[new Float32Array(highlight),3]}/></bufferGeometry><meshBasicMaterial color="#0d9488" transparent opacity={.20} side={THREE.DoubleSide} depthWrite={false} toneMapped={false}/></mesh>}
+                {ridgePts.length>0&&<Lines points={ridgePts} segments color={canvasStyle.planRidge} opacity={drawing?.5:.75} order={10060}/>}
+                {gutterPts.length>0&&<Lines points={gutterPts} segments color={canvasStyle.planGutter} opacity={drawing?.45:.62} order={10060}/>}
+              </>;
             }
             const t=p.high*(p.axis==='z'?r.depth:r.width)/2;
             return <Lines points={p.axis==='z'?[-r.width/2,.04,t,r.width/2,.04,t]:[t,.04,-r.depth/2,t,.04,r.depth/2]} color="#d97706"/>;
@@ -836,7 +877,7 @@ function Scene(input: ViewProps) {
           <group key={o.id} position={[o.x, props.mode==="top"?0:o.baseHeight??0, o.z]} rotation={[0, o.yaw, 0]}>
             <mesh position={[0, props.mode==="top"?.09:o.height / 2, 0]}>
               <boxGeometry args={[o.width, props.mode==="top"?.16:o.height, o.depth]} />
-              <meshBasicMaterial color={props.mode==='top'?palette.fill:'#f0f2f5'} toneMapped={false}/>
+              <meshBasicMaterial key={drawing?'drawing':'solid'} color={props.mode==='top'?palette.fill:'#f0f2f5'} transparent={drawing} opacity={drawing?.25:1} depthWrite={!drawing} toneMapped={false}/>
             </mesh>
             <Lines
               points={outline(o.width, o.depth, props.mode==="top"?.18:o.height + 0.01)}
@@ -853,7 +894,7 @@ function Scene(input: ViewProps) {
       {!detailed&&props.mode!=='top'&&<CarportSupports arrays={renderArrays}/>}
       {!detailed &&
         renderArrays.map((a) => (
-          props.mode==='top'?<TopArray map={topCells} key={a.id} a={a} selected={props.selectedId===a.id} conflict={props.issues.some(i=>i.ids.includes(a.id))}/>:<ArrayMesh
+          props.mode==='top'?<TopArray map={topCells} key={a.id} a={a} selected={props.selectedId===a.id} conflict={props.issues.some(i=>i.ids.includes(a.id))} faded={drawing}/>:<ArrayMesh
             key={a.id}
             a={a}
             selected={props.selectedId === a.id}
@@ -885,7 +926,7 @@ function Scene(input: ViewProps) {
 }
 export default function ThreeView(props: ViewProps) {
   return (
-    <Canvas className="workbench-canvas" dpr={1} shadows frameloop="demand" gl={{ antialias: true }}>
+    <Canvas className="workbench-canvas" dpr={[1, 2]} shadows frameloop="demand" gl={{ antialias: true }}>
       <Scene {...props} />
     </Canvas>
   );

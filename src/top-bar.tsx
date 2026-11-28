@@ -23,6 +23,7 @@ type Props=TopBarState&{
 };
 /** Run a project-menu action and close the menu first. */
 const menuAction=(action:()=>void)=>(e:{currentTarget:Element})=>{e.currentTarget.closest('details')?.removeAttribute('open');action();};
+const isMac=typeof navigator!=='undefined'&&/Mac|iPhone|iPad|iPod/i.test(navigator.platform||navigator.userAgent);
 /** Narrow 56px Left Rail: Display-only Logo | Stage Tabs (区域 / 布置 / 报告) | Save | Global Settings | Project Menu. */
 export function TopBar(p:Props){
  const {importing,saving,running,imageOpen,stress}=p;
@@ -43,7 +44,7 @@ export function TopBar(p:Props){
   </div>}
   <div className="rail-group rail-bottom top-actions">
    {!p.viewOnly&&<div className="rail-save-wrap rail-save-action">
-    <button className={`rail-btn rail-tab rail-utility icon-button${p.saveNotice?.error?' is-error':''}`} disabled={saving||importing} aria-label={saving?tx('保存中…'):tx('保存项目')} aria-busy={saving} data-tooltip={saving?tx('保存中…'):`${tx('保存项目')} · Ctrl+S`} onClick={p.onSave}>
+    <button className={`rail-btn rail-tab rail-utility icon-button${p.saveNotice?.error?' is-error':''}`} disabled={saving||importing} aria-label={saving?tx('保存中…'):tx('保存项目')} aria-busy={saving} data-tooltip={saving?tx('保存中…'):`${tx('保存项目')} · ${isMac?'⌘S':'Ctrl+S'}`} onClick={p.onSave}>
      <Icon name="save"/><small>{tx('保存')}</small>
     </button>
     {p.saveNotice&&<p key={p.saveNotice.id} className={`save-notice${p.saveNotice.error?' is-error':''}`} role={p.saveNotice.error?'alert':'status'}><Icon name={p.saveNotice.error?'alert':'check'}/><span>{p.saveNotice.text}</span>{p.saveNotice.error&&<button className="icon-button" aria-label={tx('关闭')} title={tx('关闭')} onClick={p.onDismissSaveNotice}><Icon name="close"/></button>}</p>}

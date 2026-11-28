@@ -1,6 +1,6 @@
 import {SceneReady} from './scene-ready';
 import {footprintLines} from './footprint-mesh';
-import {roofHeight} from './pitched-roof';
+import {maxRoofHeight} from './pitched-roof';
 import {sunPosition,type SunSettings} from './sun-position';
 import { CarportSupports } from './carport-supports';
 import { PitchedMesh } from './pitched-mesh';
@@ -356,7 +356,7 @@ export function RealisticScene({
     return hosts;
   },[sites,obstacles,delivery,stress]);
   const attachedIds=useMemo(()=>new Set([...contacts.values()].flatMap(contact=>contact.objects.map(object=>object.id))),[contacts]);
-  const maxHeight=Math.max(0,...surfaces.map(r=>r.pitch?Math.max(roofHeight(r,r.pitch,0,0),...[-1,1].flatMap(x=>[-1,1].map(z=>roofHeight(r,r.pitch!,x*r.width/2,z*r.depth/2))))+(r.pitch.kind==='gable'&&!delivery?r.wallHeight:0):(r.flatHeight??3.5)-3.5+r.wallHeight),...obstacles.map(o=>(o.baseHeight??0)+o.height));
+  const maxHeight=Math.max(0,...surfaces.map(r=>r.pitch?maxRoofHeight(r,r.pitch)+(r.pitch.kind==='gable'&&!delivery?r.wallHeight:0):(r.flatHeight??3.5)-3.5+r.wallHeight),...obstacles.map(o=>(o.baseHeight??0)+o.height));
   const targetHeight=(maxHeight-3.5)/2;
   lightTarget.position.set(center.x,targetHeight,center.z);
   const data = useMemo(() => instanceData(arrays), [arrays]);

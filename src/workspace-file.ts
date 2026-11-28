@@ -11,7 +11,7 @@ import {parseModuleCatalog,sameModule,type ModuleCatalogItem} from './module-lib
 import {tx} from './i18n';
 import {readExtras,type ProjectExtras} from './project-extras';
 /** A project file: the core fields plus the add-on fields (ProjectExtras), which older files may not have. */
-export type WorkspaceFile={version:3;sunSettings?:SunSettings;imageOverlays?:ImageOverlay[];moduleCatalog?:ModuleCatalogItem[];globalEdge?:number;globalRidgeEdge?:number;name:string;address?:string;hasRegions?:boolean;roofs:RoofDesign[];activeId:string;solarHour:number;backgroundColor:string;groundColor:string;baseImage?:BaseImage}&Partial<ProjectExtras>;
+export type WorkspaceFile={version:3;viewRotation?:number;sunSettings?:SunSettings;imageOverlays?:ImageOverlay[];moduleCatalog?:ModuleCatalogItem[];globalEdge?:number;globalRidgeEdge?:number;name:string;address?:string;hasRegions?:boolean;roofs:RoofDesign[];activeId:string;solarHour:number;backgroundColor:string;groundColor:string;baseImage?:BaseImage}&Partial<ProjectExtras>;
 export function parseWorkspace(text:string):WorkspaceFile {
  const raw=JSON.parse(text);
  if(raw.version!==3){const p=parseProject(text),r={...newRoof(),northAngle:p.baseImage?.northAngle,roof:p.roof,obstacles:p.obstacles,arrays:p.arrays,moduleSpec:p.module,layoutOptions:p.rules,flatHeight:undefined,wallHeight:p.wallHeight};const b=p.baseImage;
@@ -25,16 +25,19 @@ export function parseWorkspace(text:string):WorkspaceFile {
  if(p.imageOverlays!==undefined)p.imageOverlays=parseImageOverlays(p.imageOverlays);
  readExtras(raw);
  if(p.address!==undefined&&typeof p.address!=='string')throw new Error(tx('项目地址无效'));
+ if(p.viewRotation!==undefined&&(!Number.isFinite(p.viewRotation)||Math.abs(p.viewRotation)>360))throw new Error(tx('画布旋转角度无效'));
  if(p.hasRegions!==undefined&&typeof p.hasRegions!=='boolean')throw new Error(tx('区域状态无效'));
  if(!Array.isArray(p.roofs)||!p.roofs.length||p.roofs.length>50||new Set(p.roofs.map(r=>r.id)).size!==p.roofs.length)throw new Error(tx('屋面数量或标识无效'));
  for(const r of p.roofs){
   if([r.edgeOverride,r.ridgeEdgeOverride].some(edge=>edge!==undefined&&(!Number.isFinite(edge)||edge<0||edge>20)))throw new Error(tx('单独设置的屋面边距无效'));
-  if(r.roof?.outline&&(r.pitch||r.carport))throw new Error(tx('多段线轮廓仅支持平屋面'));
+  if(r.shadingOnly!==undefined&&typeof r.shadingOnly!=='boolean')throw new Error(tx('遮挡状态无效'));
+  if(r.shadingOnly&&r.carport)throw new Error(tx('车棚不能设为障碍建筑'));
+  if(r.roof?.outline&&(r.carport||(r.pitch&&r.pitch.kind!=='gable')))throw new Error(tx('多段线轮廓仅支持平屋面、双坡屋面、连坡屋面和障碍建筑'));
   if(r.northAngle!==undefined&&(!Number.isFinite(r.northAngle)||r.northAngle<0||r.northAngle>=360))throw new Error(tx('北向角度无效'));
   r.northAngle=p.baseImage?.northAngle??r.northAngle;
   if(r.flatHeight!==undefined&&(!Number.isFinite(r.flatHeight)||r.flatHeight<1||r.flatHeight>100))throw new Error(tx('屋面高度无效'));
   if(r.carport!==undefined&&(!validCarport(r.carport)||r.pitch||r.moduleSpec?.kind==='lightweight'))throw new Error(tx('车棚参数或组件类型无效'));
-  if(r.pitch!==undefined&&!validPitch(r.pitch))throw new Error(tx('屋面坡度参数无效'));
+  if(r.pitch!==undefined&&!validPitch(r.pitch,r.roof))throw new Error(tx('屋面坡度参数无效'));
   if(typeof r.id!=='string'||r.id.includes('/')||typeof r.name!=='string'||![r.x,r.z,r.yaw].every(Number.isFinite)||Math.abs(r.x)>100000||Math.abs(r.z)>100000)throw new Error(tx('屋面坐标无效'));
   validateProject({version:2,name:p.name,roof:r.roof,obstacles:r.obstacles,arrays:r.arrays,module:r.moduleSpec,rules:r.layoutOptions,wallHeight:r.wallHeight,solarHour:p.solarHour,backgroundColor:p.backgroundColor,groundColor:p.groundColor},r.pitch?6:MAX_FLAT_TABLE_ROWS);
   if(r.moduleSpec.kind===undefined)r.moduleSpec.kind=r.pitch?'lightweight':'standard';

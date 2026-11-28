@@ -14,7 +14,7 @@ import {workbenchAddons,type AddonContext} from './workbench-addons';
 import './photo-tool';
 import {currentProjectId,listRecent,newProjectId,readRecent,removeRecent,resolveProjectName,saveRecent,setCurrentProjectId,type RecentProject} from './recent-projects';
 import {activeRoofIssues,worldIssues,worldPanelShadowZones,winterCheckLines} from './roof-shadows';
-import {neighborShadowCasters} from './neighbor-shadows';
+import {layoutShadowSources,neighborShadowCasters} from './neighbor-shadows';
 import {activeLayoutArea} from './layout-area';
 import {LayoutStatus} from './layout-status';
 import {CanvasLegend} from './canvas-overlay';
@@ -69,7 +69,7 @@ import "./brand.css";
 import "./theme/install";
 import {ModulePicker} from './module-library-panel';
 import {NewProjectDialog,CanvasObjectMenu} from './workspace-dialogs';
-import {defaultModuleCatalog,projectDefaultModule,sameModule,type ModuleCatalogItem} from './module-library';
+import {defaultSharedModule,projectDefaultModule,sameModule,type ModuleCatalogItem} from './module-library';
 import {readModuleLibrary} from './saved-module-library';
 import { ImageEditor } from './image-editor';
 import {CalibrationWorkspace} from './calibration-workspace';
@@ -95,11 +95,37 @@ function prepareElementArray(roof:RoofDesign,targetId:string,spec:ElementArraySp
   })}:roof;
   return createOrUpdateObstacleArrayGroup(source,targetId,arraySpec,idFor);
 }
+function useAnimatedAngle(target:number,resetEpoch:number){
+  const [angle,setAngle]=useState(target);
+  const currentRef=useRef(angle);currentRef.current=angle;
+  const epochRef=useRef(resetEpoch);
+  useEffect(()=>{
+    if(epochRef.current!==resetEpoch){epochRef.current=resetEpoch;setAngle(target);return;}
+    const start=currentRef.current;
+    let delta=((target-start+540)%360)-180;
+    if(Math.abs(delta)<.02||typeof window==='undefined'||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches){
+      setAngle(target);return;
+    }
+    const duration=220,t0=performance.now();
+    let raf=0;
+    const step=(now:number)=>{
+      const t=Math.min(1,(now-t0)/duration),eased=1-(1-t)**3;
+      if(t>=1){setAngle(target);return;}
+      const next=start+delta*eased;
+      setAngle(((next+180)%360+360)%360-180);
+      raf=requestAnimationFrame(step);
+    };
+    raf=requestAnimationFrame(step);
+    return()=>cancelAnimationFrame(raf);
+  },[target,resetEpoch]);
+  return angle;
+}
 function App() {
   const engine = "three";
   const [historyEpoch,setHistoryEpoch]=useState(0);
   const {roofs,setRoofs,active,setActiveId,roof,moduleSpec,layoutOptions,setLayoutOptions,wallHeight,obstacles,setObstacles,arrays,setArrays,layoutSignature,setLayoutSignature,layoutMessage,setLayoutMessage,setPrevious,
-    projectDocument,loadDocument,projectName,setProjectName,projectAddress,setProjectAddress,hasSelection,setHasSelection,globalEdge,setGlobalEdge,globalRidgeEdge,setGlobalRidgeEdge,sunSettings,setSunSettings,moduleCatalog,setModuleCatalog,baseImage,setBaseImage,imageOverlays,setImageOverlays,setExtra,clearForNewBase,solarHour,backgroundColor,setBackgroundColor,groundColor,setGroundColor}=useProjectDocument(defaultModuleCatalog);
+    projectDocument,loadDocument,projectName,setProjectName,projectAddress,setProjectAddress,hasSelection,setHasSelection,globalEdge,setGlobalEdge,globalRidgeEdge,setGlobalRidgeEdge,sunSettings,setSunSettings,moduleCatalog,setModuleCatalog,baseImage,setBaseImage,imageOverlays,setImageOverlays,setExtra,clearForNewBase,solarHour,backgroundColor,setBackgroundColor,groundColor,setGroundColor,viewRotation,setViewRotation}=useProjectDocument(()=>readModuleLibrary().items);
+  const animatedRotation=useAnimatedAngle(viewRotation,historyEpoch);
   const inspector=useRef<HTMLDivElement>(null);
 
   const [canvasMenu,setCanvasMenu]=useState<{id:string;x:number;y:number}|null>(null);
@@ -141,14 +167,17 @@ function App() {
   /** The add-on panel shown over the workbench (scheme, drawing sheet, rendering, photo match, electrical…). */
   const [addonOpen,setAddonOpen]=useState<string|null>(null);
   const [drawingTool,setDrawingTool]=useState<'roof'|'carport'|'obstacle'|'keepout'>('roof');
-  const [drawingIntent,setDrawingIntent]=useState<'crop'|'create'|'reshape'|'reshape-object'|'obstacle'|'keepout'>('create');
+  const [drawingIntent,setDrawingIntent]=useState<'crop'|'create'|'reshape'|'reshape-object'|'obstacle'|'keepout'|'horizon'|'cut-spans'>('create');
+  const [highlightedSpan,setHighlightedSpan]=useState<number|null>(null);
   const [calibration,setCalibration]=useState<{mode:'import'|'rescale';base:BaseImage}|null>(null);
   const cancelCalibration=useCallback(()=>setCalibration(null),[]);
   const [imageOpen,setImageOpen] = useState(false);
   const areaDrawing=imageOpen&&!!baseImage&&((drawingIntent==='create'&&(drawingTool==='roof'||drawingTool==='carport'))||drawingIntent==='reshape');
+  const horizonDrawing=imageOpen&&!!baseImage&&drawingIntent==='horizon';
+  const cuttingSpans=imageOpen&&!!baseImage&&drawingIntent==='cut-spans';
   const [layoutAreaOpen,setLayoutAreaOpen]=useState(false);
   const objectDrawing=imageOpen&&!!baseImage&&!!objectDraft&&(drawingIntent==='obstacle'||drawingIntent==='keepout'||drawingIntent==='reshape-object');
-  const inlineDrawing=areaDrawing||objectDrawing||layoutAreaOpen;
+  const inlineDrawing=areaDrawing||objectDrawing||layoutAreaOpen||horizonDrawing||cuttingSpans;
   const [fileMessage,setFileMessage] = useState('');
   // Save result next to the save button: shown on every tab and with the panel folded. A new id per save restarts the timer.
   const [saveNotice,setSaveNotice]=useState<{text:string;error?:boolean;id:number}|null>(null);
@@ -202,9 +231,9 @@ function App() {
         return null;
       }
     });
-  // Undo covers the saved project except the 3D view settings (sun hour and colours).
+  // Undo covers the saved project except the 3D view settings (sun hour, colours and 2D working view rotation).
   const workspaceKeys=entry==='workspace'&&!layoutReportOpen&&!addonOpen&&!layoutAreaOpen&&!imageOpen&&!calibration&&!importing&&!saving&&!newProjectOpen&&!stress;
-  const historyValue=useMemo(()=>{const {solarHour:_,backgroundColor:__,groundColor:___,...value}=projectDocument;return value;},[projectDocument]);
+  const historyValue=useMemo(()=>{const {solarHour:_,backgroundColor:__,groundColor:___,viewRotation:____,...value}=projectDocument;return value;},[projectDocument]);
   const history=useProjectHistory(historyValue,(a,b)=>{if(a===b)return true;
     // Pictures (every `url`: base drawing, overlays, add-on photos) are compared by identity, the rest by content.
     const signature=(v:typeof historyValue)=>{const urls:unknown[]=[v.baseImage?.url];
@@ -217,7 +246,8 @@ function App() {
   const running = progress.startsWith("第")||progress.startsWith("Round");
   const edges={edge:globalEdge,ridge:globalRidgeEdge};
   const activeEdges=roofLayoutEdges(active,edges);
-  const currentSignature = layoutSignatureFor(active,edges);
+  const shadowSources=useMemo(()=>layoutShadowSources(roofs,coreEdition),[roofs]);
+  const currentSignature = layoutSignatureFor(active,edges,shadowSources);
   const layoutStale = layoutSignature !== currentSignature;
   const needsOutline=!!baseImage&&(!baseImage.metersPerPixel||!hasSelection);
   const overlappingRoofs=useMemo(()=>roofs.filter(r=>r.id!==active.id&&overlaps(roofRect(active),roofRect(r))),[roofs,active]);
@@ -227,9 +257,10 @@ function App() {
   const runLayout = (options: LayoutOptions) => {
     if(!checkLocation())return;
     try {
+      if(active.shadingOnly)throw new Error(tx('障碍建筑仅作遮挡，不参与光伏布置'));
       if(needsOutline)throw new Error(tx('请先标定并圈屋面'));
       if(overlappingRoofs.length)throw new Error(tx('当前屋面与其他屋面重叠，请先调整轮廓'));
-      const result = autoLayout(roof, obstacles, { ...options, removeIsolated:true, alignment:options.alignment??DEFAULT_WORKBENCH_ALIGNMENT,...activeEdges, carport:active.carport, pitch:active.pitch, wallHeight, module: moduleSpec, roofYaw:geographicYaw(active), limit:MAX_PROJECT_PANELS-totals(roofs.filter(r=>r.id!==active.id)).count },coreEdition?neighborShadowCasters(active,roofs):[]);
+      const result = autoLayout(roof, obstacles, { ...options, removeIsolated:true, alignment:options.alignment??DEFAULT_WORKBENCH_ALIGNMENT,...activeEdges, carport:active.carport, pitch:active.pitch, wallHeight, module: moduleSpec, roofYaw:geographicYaw(active), limit:MAX_PROJECT_PANELS-totals(roofs.filter(r=>r.id!==active.id)).count },neighborShadowCasters(active,shadowSources));
       setFileMessage("");
       setLayoutSignature(currentSignature);
       setSelectedObstacle(null);
@@ -239,7 +270,7 @@ function App() {
       setLayoutMessage(tx('已排布 {0} 块 / {1} kWp · 前后净距 {2} m{3}{4}',result.count,(result.count * moduleSpec.power / 1000).toFixed(2),result.rowGap.toFixed(2),result.shortened ? tx(' · 允许部分遮挡') : "",result.capped ? tx(' · 已达完整连排数量上限') : ""));
     } catch(e) { setLayoutMessage(tx('请检查参数：{0}。组件长宽 0.2–5m，功率 1–2000Wp，平屋面连排 1–{1}，坡屋面 1–6、列数 1–100，间距不得为负。',e instanceof Error ? e.message : tx('排布失败'),MAX_FLAT_TABLE_ROWS)); }
   };
-  const issues = useMemo(()=>activeRoofIssues(active,designRays,overlappingRoofs,coreEdition?roofs:[]),[active,designRays,overlappingRoofs,roofs]),
+  const issues = useMemo(()=>activeRoofIssues(active,designRays,overlappingRoofs,shadowSources),[active,designRays,overlappingRoofs,shadowSources]),
     count = arrays.reduce((sum, a) => sum + a.rows * a.columns, 0);
   const selectedObstacle = obstacles.find(o => o.id === selectedObstacleId);
   useEffect(()=>{inspector.current?.scrollTo({top:0});},[active.id,selectedObstacleId,selectedId,panel]);
@@ -265,7 +296,7 @@ function App() {
   const bindModule=(r:RoofDesign):RoofDesign=>{
     const allowed=moduleCatalog.filter(item=>!r.carport||item.spec.kind!=='lightweight');
     let item=allowed.find(item=>item.id===r.moduleId&&sameModule(item.spec,r.moduleSpec))??allowed.find(item=>sameModule(item.spec,r.moduleSpec))??allowed[0];
-    if(!item){item={id:newId(),name:tx('标准组件 {0} Wp',defaultModule.power),spec:{...defaultModule,kind:'standard'}};const added=item;setModuleCatalog(items=>[...items,added]);}
+    if(!item){item={id:newId(),name:tx('标准组件 {0} Wp',defaultSharedModule.power),spec:{...defaultSharedModule}};const added=item;setModuleCatalog(items=>[...items,added]);}
     return {...r,moduleId:item.id,moduleSpec:{...item.spec}};
   };
   const defaults=projectDocument.layoutDefaults??initialLayoutDefaults;
@@ -301,7 +332,7 @@ function App() {
     if(baseImage&&!baseImage.frame)setBaseImage({...baseImage,frame:{x:0,y:0,width:baseImage.width,height:baseImage.height}});
     setDeletedRoof(undefined);setFileMessage(tx('已恢复删除的屋面'));
   };
-  const chooseRoof=(id:string)=>{setHasSelection(true);setActiveSelected(true);setActiveId(id);setSelected(null);setSelectedObstacle(null);setPicked([]);setPickedObjects([]);};
+  const chooseRoof=(id:string)=>{setHasSelection(true);setActiveSelected(true);setActiveId(id);setSelected(null);setSelectedObstacle(null);setPicked([]);setPickedObjects([]);setHighlightedSpan(null);};
   /** Areas picked together on the 2D canvas (Shift / Ctrl click, drag box). The current area comes first: it is the key the others align to. */
   const [picked,setPicked]=useState<string[]>([]);
   const selection=hasSelection&&activeSelected?[active.id,...picked.filter((id,i)=>id!==active.id&&picked.indexOf(id)===i&&roofs.some(r=>r.id===id))]:[];
@@ -315,8 +346,11 @@ function App() {
   const pickKey=(id:string)=>{if(selection.length>1&&selection.includes(id))pickAreas([id,...selection.filter(v=>v!==id)]);else chooseRoof(id);};
   const boxSelect=(a:Point,b:Point,add:boolean)=>{
     if(!hasSelection||overlayOpen)return;
-    const x0=Math.min(a.x,b.x),x1=Math.max(a.x,b.x),z0=Math.min(a.z,b.z),z1=Math.max(a.z,b.z);
-    const inside=roofs.filter(r=>corners(roofRect(r)).every(p=>p.x>=x0&&p.x<=x1&&p.z>=z0&&p.z<=z1)).map(r=>r.id);
+    const rad=viewRotation*Math.PI/180,c=Math.cos(rad),s=Math.sin(rad);
+    const proj=(p:Point)=>({u:p.x*c-p.z*s,v:p.x*s+p.z*c});
+    const pa=proj(a),pb=proj(b);
+    const u0=Math.min(pa.u,pb.u),u1=Math.max(pa.u,pb.u),v0=Math.min(pa.v,pb.v),v1=Math.max(pa.v,pb.v);
+    const inside=roofs.filter(r=>corners(roofRect(r)).every(p=>{const q=proj(p);return q.u>=u0&&q.u<=u1&&q.v>=v0&&q.v<=v1;})).map(r=>r.id);
     if(inside.length)pickAreas(add?[...selection,...inside.filter(id=>!selection.includes(id))]:inside);
   };
   /** Align and pattern on the Area tab. A pattern shows live while its popover is open; `patternBase` holds the design to go back to. */
@@ -331,7 +365,7 @@ function App() {
   /** Line the other picked areas up with the key area; overlaps only warn. */
   const alignSelection=(edge:AlignEdge)=>{
     const ids=new Set(selection.slice(1));if(!ids.size)return;
-    const next=roofs.map(r=>ids.has(r.id)?{...r,...alignRoof(r,active,edge)}:r);
+    const next=roofs.map(r=>ids.has(r.id)?{...r,...alignRoof(r,active,edge,viewRotation)}:r);
     const clash=next.some(r=>ids.has(r.id)&&next.some(o=>o.id!==r.id&&overlaps(roofRect(o),roofRect(r))));
     setRoofs(next);setFileMessage(clash?tx('对齐后有区域重叠，请检查'):tx('已对齐到 {0}',active.name));
   };
@@ -339,7 +373,7 @@ function App() {
   const alignObjects=(edge:AlignEdge)=>{
     const key=selectedObstacle,ids=new Set(objectSelection.slice(1));if(!key||!ids.size)return;
     const world=(o:Obstacle)=>({...o,...toWorld(o,active),yaw:o.yaw+active.yaw}),target=world(key),shift=new Map<string,{x:number;z:number}>();
-    const next=obstacles.map(o=>{if(!ids.has(o.id))return o;const n=alignRect(world(o),target,edge),p=toLocal(n,active);shift.set(o.id,{x:p.x-o.x,z:p.z-o.z});return {...o,...p,yaw:n.yaw-active.yaw};});
+    const next=obstacles.map(o=>{if(!ids.has(o.id))return o;const n=alignRect(world(o),target,edge,viewRotation),p=toLocal(n,active);shift.set(o.id,{x:p.x-o.x,z:p.z-o.z});return {...o,...p,yaw:n.yaw-active.yaw};});
     setRoofs(rs=>rs.map(r=>r.id!==active.id?r:{...r,obstacles:next,arrays:r.arrays.map(a=>{const d=a.hostObstacleId?shift.get(a.hostObstacleId):undefined;return d?{...a,x:a.x+d.x,z:a.z+d.z}:a;})}));
     setFileMessage(tx('已对齐到 {0}',key.name));
   };
@@ -383,7 +417,7 @@ function App() {
       });
       if(affectsLayout)return invalidateRoofLayoutForElements(r,nextObstacles);
       const next={...r,obstacles:nextObstacles};
-      return {...next,layoutSignature:r.layoutSignature===layoutSignatureFor(r,edges)?layoutSignatureFor(next,edges):r.layoutSignature};
+      return {...next,layoutSignature:r.layoutSignature===layoutSignatureFor(r,edges,layoutShadowSources(rs,coreEdition))?layoutSignatureFor(next,edges,layoutShadowSources(rs,coreEdition)):r.layoutSignature};
     }));
 
   };
@@ -398,7 +432,7 @@ function App() {
     }catch(e){setFileMessage((e as Error).message);return false;}
   };
   const ungroupArray=(groupId:string)=>{
-    setRoofs(rs=>rs.map(r=>{if(r.id!==active.id)return r;const next={...r,obstacles:ungroupObstacleArray(r.obstacles,groupId)};return {...next,layoutSignature:r.layoutSignature===layoutSignatureFor(r,edges)?layoutSignatureFor(next,edges):r.layoutSignature};}));
+    setRoofs(rs=>rs.map(r=>{if(r.id!==active.id)return r;const next={...r,obstacles:ungroupObstacleArray(r.obstacles,groupId)};return {...next,layoutSignature:r.layoutSignature===layoutSignatureFor(r,edges,layoutShadowSources(rs,coreEdition))?layoutSignatureFor(next,edges,layoutShadowSources(rs,coreEdition)):r.layoutSignature};}));
     setFileMessage(tx('已解散阵列组'));
   };
   const duplicateActiveRoof=()=>{
@@ -414,6 +448,13 @@ function App() {
       setRoofs(rs=>rs.map(r=>r.id!==active.id?r:{...nextRoof,arrays:[],previous:null,layoutSignature:'',layoutMessage:''}));
       setSelected(null);
     }catch(e){setFileMessage((e as Error).message);}
+  };
+  const toggleActiveShadingOnly=()=>{
+    if(active.carport)return;
+    const nextShading=!active.shadingOnly;
+    setRoofs(rs=>rs.map(r=>r.id!==active.id?r:{...r,shadingOnly:nextShading||undefined,...(nextShading?{arrays:[],previous:null,layoutSignature:'',layoutMessage:''}:{})}));
+    setSelected(null);
+    setFileMessage(nextShading?tx('{0} 已设为仅作遮挡（不参与布置）',active.name):tx('{0} 已恢复为可布置屋面',active.name));
   };
   const deleteSelection=()=>{
     if(selection.length<2){removeActiveRoof();return;}
@@ -505,7 +546,7 @@ function App() {
       else{const q=(layoutDirection(layoutOptions)+1)%4;setLayoutOptions({...layoutOptions,direction:q,portrait:q%2===0,azimuth:undefined,azimuthMode:undefined});}
       return;
     }
-    if(t?.kind==='pitch'){setRoofs(rs=>rs.map(r=>r.id===t.roofId?r.carport?flipCarportSlope(r):r.pitch?{...r,pitch:turnPitch(r.pitch)}:r:r));return;}
+    if(t?.kind==='pitch'){setRoofs(rs=>rs.map(r=>r.id===t.roofId?r.carport?flipCarportSlope(r):r.pitch?{...r,pitch:turnPitch(r.pitch,r.roof)}:r:r));return;}
     if(add&&(t.kind==='site'||t.kind==='array')){togglePicked(t.roofId);return;}
     if(t.kind==='site'){pickKey(t.roofId);setCollapsed(false);return;}
     if(t.kind==='object'){
@@ -670,7 +711,7 @@ function App() {
       setRestoredDrawingView(drawingView.current?{...drawingView.current}:undefined);
     }else{
       saveTarget.current={};projectId.current=undefined;setHistoryEpoch(n=>n+1);
-      setBaseImage(base);clearForNewBase();setAddonOpen(null);setImageOverlays([]);setOverlayOpen(false);setSelectedOverlay(null);setDeletedRoof(undefined);
+      setBaseImage(base);clearForNewBase();setViewRotation(0);setAddonOpen(null);setImageOverlays([]);setOverlayOpen(false);setSelectedOverlay(null);setDeletedRoof(undefined);
       drawingView.current=undefined;setRestoredDrawingView(undefined);setGlobalEdge(.5);setGlobalRidgeEdge(.5);
       const first={...newRegionDefaults(roofFromPrevious(active,tx('屋面 1'))),northAngle:base.northAngle};
       setRoofs([first]);setActiveId(first.id);setSelected(null);setSelectedObstacle(null);setPicked([]);setPickedObjects([]);
@@ -684,9 +725,10 @@ function App() {
       if(roofs.some((r,i)=>roofs.slice(i+1).some(s=>overlaps(roofRect(r),roofRect(s)))))throw new Error(tx('屋面之间存在重叠，请先调整轮廓'));
       let remaining=MAX_PROJECT_PANELS;
       const next=roofs.map(r=>{
-        const result=autoLayout(r.roof,r.obstacles,{...r.layoutOptions,removeIsolated:true,alignment:r.layoutOptions.alignment??DEFAULT_WORKBENCH_ALIGNMENT,...roofLayoutEdges(r,edges),carport:r.carport,pitch:r.pitch,module:r.moduleSpec,wallHeight:r.wallHeight,roofYaw:geographicYaw(r),limit:remaining},coreEdition?neighborShadowCasters(r,roofs):[]);
+        if(r.shadingOnly)return r;
+        const result=autoLayout(r.roof,r.obstacles,{...r.layoutOptions,removeIsolated:true,alignment:r.layoutOptions.alignment??DEFAULT_WORKBENCH_ALIGNMENT,...roofLayoutEdges(r,edges),carport:r.carport,pitch:r.pitch,module:r.moduleSpec,wallHeight:r.wallHeight,roofYaw:geographicYaw(r),limit:remaining},neighborShadowCasters(r,shadowSources));
         remaining-=result.count;
-        return {...r,previous:r.arrays,arrays:result.arrays,layoutSignature:layoutSignatureFor(r,edges),layoutMessage:''};
+        return {...r,previous:r.arrays,arrays:result.arrays,layoutSignature:layoutSignatureFor(r,edges,shadowSources),layoutMessage:''};
       });
       setRoofs(next);setSelected(null);setFileMessage(remaining<3?tx('全部屋面已布置，接近项目 10000 块上限'):tx('全部屋面已布置'));
     }catch(e){setFileMessage((e as Error).message);}
@@ -695,7 +737,8 @@ function App() {
   const createRegion=(form:RegionForm)=>{
     setCreating(false);setDrawingIntent('create');setDrawingForm(form);
     if(baseImage&&!baseImage.metersPerPixel){setCalibration({mode:'rescale',base:baseImage});return;}
-    const carport=form.endsWith('carport'),prefix=carport?tx('车棚'):tx('屋面');
+    const carport=form.endsWith('carport'),obstacleBuilding=form==='obstacle-building';
+    const prefix=carport?tx('车棚'):obstacleBuilding?tx('障碍建筑'):form==='multi-gable'?tx('连坡屋面'):tx('屋面');
     let n=1;
     while(hasSelection&&roofs.some(r=>r.name===`${prefix} ${n}`))n++;
     const name=`${prefix} ${n}`;
@@ -719,10 +762,13 @@ function App() {
       if(!preview.skipped||preview.memberIds.length>=2)return preview;
     }catch{/* An invalid draft leaves the canvas on the last saved geometry. */}
   },[elementArrayPreview,active,inlineDrawing]);
-  const worldArrays=useMemo(()=>(hasSelection?roofs:[]).flatMap(r=>(objectDrawing||layoutAreaOpen)&&r.id===active.id?[]:r.arrays.map(a=>worldArray(a,r))),[hasSelection,roofs,objectDrawing,layoutAreaOpen,active.id]);
+  const worldArrays=useMemo(()=>(hasSelection?roofs:[]).flatMap(r=>(objectDrawing||layoutAreaOpen||cuttingSpans||(areaDrawing&&drawingIntent==='reshape'))&&r.id===active.id?[]:r.arrays.map(a=>worldArray(a,r))),[hasSelection,roofs,objectDrawing,layoutAreaOpen,cuttingSpans,areaDrawing,drawingIntent,active.id]);
   const worldObjects=useMemo(()=>(hasSelection?roofs:[]).flatMap(r=>(r.id===active.id&&arrayPreview?arrayPreview.obstacles:r.obstacles)
    .filter(o=>!(objectDrawing&&drawingIntent==='reshape-object'&&r.id===active.id&&o.id===objectDraft?.id)).map(o=>worldObstacle(o,r))),[hasSelection,roofs,active.id,arrayPreview,objectDrawing,drawingIntent,objectDraft?.id]);
-  const sceneSites=useMemo(()=>(hasSelection?roofs:[]).map((r,index)=>({...roofRect(r),id:r.id,name:r.name,planNumber:index+1,capacity:panel==='layout'?r.arrays.reduce((s,a)=>s+a.rows*a.columns*(a.module??defaultModule).power/1000,0):undefined,wallHeight:r.wallHeight,markerPitch:carportPitch(r),pitch:r.pitch,carport:r.carport,flatHeight:r.flatHeight,layoutArea:activeLayoutArea(r.layoutOptions)})),[hasSelection,roofs,panel]);
+  const sceneSites=useMemo(()=>{
+    let planNum=0;
+    return (hasSelection?roofs:[]).map(r=>({...roofRect(r),id:r.id,name:r.name,shadingOnly:r.shadingOnly,planNumber:r.shadingOnly?undefined:++planNum,capacity:panel==='layout'&&!r.shadingOnly?r.arrays.reduce((s,a)=>s+a.rows*a.columns*(a.module??defaultModule).power/1000,0):undefined,wallHeight:r.wallHeight,markerPitch:carportPitch(r),pitch:r.pitch,carport:r.carport,flatHeight:r.flatHeight,layoutArea:activeLayoutArea(r.layoutOptions)}));
+  },[hasSelection,roofs,panel]);
   const previewWorldIds=arrayPreview?.memberIds.map(id=>active.id+'/'+id);
   const resolvePreviewHit=(id:string|null)=>{
     if(!id?.startsWith('@o/')||!previewWorldIds?.includes(id.slice(3))||!elementArrayPreview)return id;
@@ -733,9 +779,21 @@ function App() {
   // The Core canvas draws actual shaded areas separately. Red is reserved for geometry conflicts.
   const issuesOnCanvas=useMemo(()=>worldIssues(roofs,coreEdition?[]:designRays,false),[roofs,designRays]);
   const View = Three;
-  const shadow=shadowNotice(sunSettings,hasSelection?roofs:[],edges);
+  const shadow=shadowNotice(sunSettings,hasSelection?roofs:[],edges,coreEdition);
   const pending=useMemo(()=>reportReadiness(roofs,{edge:globalEdge,ridge:globalRidgeEdge},coreEdition),[roofs,globalEdge,globalRidgeEdge]);
-  const drawingEditor=imageOpen && baseImage && <ImageEditor hasExistingRegions={hasSelection} embedded={inlineDrawing} toolbarAnchor={layoutAreaOpen?'layout-limit':objectDrawing?'elements':'roof'} layoutArea={layoutAreaOpen?{apply:points=>setLayoutOptions(v=>({...v,layoutArea:points,layoutAreaEnabled:true})),clear:activeLayoutArea(layoutOptions)?()=>setLayoutOptions(v=>({...v,layoutArea:undefined,layoutAreaEnabled:false})):undefined}:undefined} draftObject={objectDrawing?objectDraft??undefined:undefined} onDraftObject={setObjectDraft} onObjectCreated={id=>{setSelectedObstacle(id);setPickedObjects([]);if(active.arrays.length)setFileMessage(tx('屋面要素已变化，请更新布置'));}} panMode={navigationMode==='pan'} fitSignal={drawingFitSignal} onViewChange={inlineDrawing?v=>setRestoredDrawingView({...v}):undefined} draftRegion={areaDrawing?drawingDraft??undefined:undefined} onDraftRegion={setDrawingDraft} building={creatingBuilding} imageOverlays={imageOverlays} obstacleHeight={obstacleHeight} onObstacleHeight={setObstacleHeight} onUndo={history.undo} onRedo={history.redo} canUndo={history.canUndo} canRedo={history.canRedo} intent={drawingIntent} initialForm={drawingForm} initialTool={drawingTool} initialView={drawingIntent==='crop'?undefined:drawingView.current??(inlineDrawing&&baseImage?.blank&&drawingIntent!=='reshape'&&drawingIntent!=='reshape-object'?blankDrawingInitialView(baseImage):undefined)} onViewClose={v=>{if(drawingIntent==='crop')return;drawingView.current=v;setRestoredDrawingView({...v});}} base={baseImage} roofs={roofs} activeId={active.id} activeObjectId={selectedObstacleId} onBase={setBaseImage} onRoofs={next=>setRoofs(next.map(bindModule))} onActive={chooseRoof} onClose={()=>{setLayoutAreaOpen(false);setObjectDraft(null);setDrawingDraft(null);setImageOpen(false);setMode('top');if(drawingIntent==='crop'){setOverlayOpen(true);return;}setPanel(layoutAreaOpen?'layout':'roof');}}/>;
+  const openHorizonCalibration=()=>{
+    if(horizonDrawing){setImageOpen(false);return;}
+    if(!baseImage){const blank=blankDrawing();setBaseImage(blank);drawingView.current=blankDrawingInitialView(blank);}
+    setMode('top');setNavigationMode('select');setMeasureTool(null);setCanvasMenu(null);setDisplayOpen(false);setSunOpen(false);setOverlayOpen(false);
+    setDrawingDraft(null);setObjectDraft(null);setLayoutAreaOpen(false);setDrawingIntent('horizon');setImageOpen(true);
+  };
+  const openCutSpans=()=>{
+    if(!active.pitch?.spans)return;
+    if(!baseImage){const blank=blankDrawing();setBaseImage(blank);drawingView.current=blankDrawingInitialView(blank);}
+    setMode('top');setNavigationMode('select');setMeasureTool(null);setCanvasMenu(null);setDisplayOpen(false);setSunOpen(false);setOverlayOpen(false);
+    setDrawingDraft(null);setObjectDraft(null);setLayoutAreaOpen(false);setHighlightedSpan(null);setDrawingIntent('cut-spans');setImageOpen(true);
+  };
+  const drawingEditor=imageOpen && baseImage && <ImageEditor key={drawingIntent==='cut-spans'?`cut-${active.id}`:undefined} viewRotation={animatedRotation} onViewRotation={setViewRotation} hasExistingRegions={hasSelection} embedded={inlineDrawing} toolbarAnchor={layoutAreaOpen?'layout-limit':objectDrawing?'elements':'roof'} layoutArea={layoutAreaOpen?{apply:points=>setLayoutOptions(v=>({...v,layoutArea:points,layoutAreaEnabled:true})),clear:activeLayoutArea(layoutOptions)?()=>setLayoutOptions(v=>({...v,layoutArea:undefined,layoutAreaEnabled:false})):undefined}:undefined} draftObject={objectDrawing?objectDraft??undefined:undefined} onDraftObject={setObjectDraft} onObjectCreated={id=>{setSelectedObstacle(id);setPickedObjects([]);if(active.arrays.length)setFileMessage(tx('屋面要素已变化，请更新布置'));}} panMode={navigationMode==='pan'} fitSignal={drawingFitSignal} onViewChange={inlineDrawing?v=>setRestoredDrawingView({...v}):undefined} draftRegion={areaDrawing?drawingDraft??undefined:undefined} onDraftRegion={setDrawingDraft} building={creatingBuilding} imageOverlays={imageOverlays} obstacleHeight={obstacleHeight} onObstacleHeight={setObstacleHeight} onUndo={history.undo} onRedo={history.redo} canUndo={history.canUndo} canRedo={history.canRedo} intent={drawingIntent} initialForm={drawingForm} initialTool={drawingTool} initialView={drawingIntent==='crop'?undefined:drawingView.current??(inlineDrawing&&baseImage?.blank&&drawingIntent!=='reshape'&&drawingIntent!=='reshape-object'&&drawingIntent!=='horizon'&&drawingIntent!=='cut-spans'?blankDrawingInitialView(baseImage):undefined)} onViewClose={v=>{if(drawingIntent==='crop')return;drawingView.current=v;setRestoredDrawingView({...v});}} base={baseImage} roofs={roofs} activeId={active.id} activeObjectId={selectedObstacleId} onBase={setBaseImage} onRoofs={next=>setRoofs(next.map(bindModule))} onActive={chooseRoof} onClose={()=>{setLayoutAreaOpen(false);setObjectDraft(null);setDrawingDraft(null);setImageOpen(false);setMode('top');if(drawingIntent==='crop'){setOverlayOpen(true);return;}if(drawingIntent==='horizon'||drawingIntent==='cut-spans')return;setPanel(layoutAreaOpen?'layout':'roof');}}/>;
   const calibrationView=calibration&&<CalibrationWorkspace base={calibration.base} recalibrating={calibration.mode==='rescale'} roofs={hasSelection?roofs:[]} onCancel={cancelCalibration} onConfirm={confirmCalibration}/>;
   if(entry!=='workspace')return calibrationView??<ProjectStart sunSettings={sunSettings} onSunSettings={setSunSettings} pendingDrawing={baseImage&&!baseImage.metersPerPixel?baseImage.name:undefined} name={projectName} address={projectAddress} onName={setProjectName} onAddress={changeAddress} phone={phone} creating={entry==='new'} busy={importing} message={fileMessage} recent={recent} restoring={restoring} onOpenRecent={id=>void openRecent(id)} onRemoveRecent={id=>void deleteRecent(id)} onNew={createBlankProject} onBack={()=>setEntry('welcome')} onOpen={openFile} onCreate={(mode,file)=>{if(!locationResolved(sunSettings)){setFileMessage(tx('请先填写可识别地点或完整经纬度。'));return;}setFileMessage('');if(mode==='drawing'){if(!file&&baseImage&&!baseImage.metersPerPixel){setCalibration({mode:'rescale',base:baseImage});}else void loadImage(file);}else{const blank=blankDrawing();setBaseImage(blank);drawingView.current=blankDrawingInitialView(blank);setImageOpen(false);setHistoryEpoch(n=>n+1);setEntry('workspace');}}}/>;
   return (<>
@@ -782,9 +840,9 @@ function App() {
           </header>}
           {viewOnly&&!collapsed&&<p className="view-only-note" role="note">{tx('仅查看 · 编辑请使用电脑或平板')}</p>}
           {!viewOnly&&!inlineDrawing&&<><LocationMismatchNotice value={sunSettings} address={projectAddress} onSettings={()=>setSettingsTab('project')}/></>}
-          {areaDrawing?<header className="region-context-header drawing-context-header"><span className="region-title">{drawingIntent==='reshape'?tx('编辑区域'):drawingDraft?.carport?tx('新建车棚'):tx('新建屋面')}</span></header>:!viewOnly&&!collapsed&&<RegionBar layoutAction={{run:()=>runLayout(layoutOptions),disabled:stress||running||needsOutline||!hasSelection||!activeSelected,stale:layoutStale&&(arrays.length>0||!!active.previous?.length),runAll:roofs.length>1&&hasSelection?runAll:undefined,allDisabled:stress||running}} locked={objectDrawing||layoutAreaOpen} roofs={roofs} active={active} hasSelection={hasSelection&&activeSelected} panel={panel} creating={creating} importing={importing} running={running} canReshape={!!baseImage} canUndoDelete={!!deletedRoof}
+          {areaDrawing?<header className="region-context-header drawing-context-header"><span className="region-title">{drawingIntent==='reshape'?tx('编辑区域'):drawingDraft?.carport?tx('新建车棚'):drawingDraft?.shadingOnly?tx('新建障碍建筑'):drawingDraft?.pitch?.spans?tx('新建连坡屋面'):tx('新建屋面')}</span></header>:!viewOnly&&!collapsed&&<RegionBar layoutAction={{run:()=>runLayout(layoutOptions),disabled:stress||running||needsOutline||!hasSelection||!activeSelected||!!active.shadingOnly,stale:layoutStale&&(arrays.length>0||!!active.previous?.length),runAll:roofs.filter(r=>!r.shadingOnly).length>1&&hasSelection?runAll:undefined,allDisabled:stress||running}} locked={objectDrawing||layoutAreaOpen||cuttingSpans} roofs={roofs} active={active} hasSelection={hasSelection&&activeSelected} panel={panel} creating={creating} importing={importing} running={running} canReshape={!!baseImage} canUndoDelete={!!deletedRoof}
             onCollapse={()=>setCollapsed(!collapsed)} onAdd={()=>setCreating(true)} onCancelCreate={()=>setCreating(false)} onCreateRegion={createRegion} onChoose={chooseRoof} onRename={name=>setRoofs(rs=>rs.map(r=>r.id===active.id?{...r,name}:r))}
-            onReshape={()=>editCanvasObject('@s/'+active.id)} onDuplicate={duplicateActiveRoof} onDelete={removeActiveRoof} onUndoDelete={undoRoofRemoval} onChangeType={changeActiveRoofType}/>}
+            onReshape={()=>editCanvasObject('@s/'+active.id)} onDuplicate={duplicateActiveRoof} onDelete={removeActiveRoof} onUndoDelete={undoRoofRemoval} onChangeType={changeActiveRoofType} onToggleShadingOnly={toggleActiveShadingOnly}/>}
 {/* RegionBar handles add & rename */}
 {/* RegionBar handles reshape & delete */}
 
@@ -807,6 +865,10 @@ function App() {
 
 
           <div className="layout-inspector" hidden={panel !== 'layout'||!hasSelection||!activeSelected}>
+          {active.shadingOnly?<div className="shading-only-layout-notice">
+           <p>{tx('该区域为障碍建筑（仅作遮挡），不参与光伏布置与装机统计。')}</p>
+           <button type="button" className="subtle-action-row" disabled={running||stress} onClick={toggleActiveShadingOnly}><Icon name="flat-roof"/><span>{tx('转为可布置屋面')}</span></button>
+          </div>:<>
           <ModulePicker items={moduleCatalog} value={active.moduleId} inherited={usesProjectModule(active)} standardOnly={!!active.carport} disabled={running||stress} onSelect={(item,inherit)=>setRoofs(rs=>rs.map(r=>r.id===active.id?applyRegionModule(r,item,inherit):r))}/>
 
 
@@ -833,12 +895,13 @@ function App() {
            setMode('top');setNavigationMode('select');setMeasureTool(null);setCanvasMenu(null);setDisplayOpen(false);setSunOpen(false);setOverlayOpen(false);
            setDrawingIntent('keepout');setDrawingTool('keepout');setDrawingForm(undefined);setLayoutAreaOpen(true);setImageOpen(true);
           }} options={{...layoutOptions,carport:active.carport,pitch:active.pitch,module:moduleSpec,roofYaw:geographicYaw(active)}} onChange={v=>{const {module,roofYaw,pitch,carport,...rules}=v;if(!active.pitch&&!active.carport&&(rules.frontHeight??DEFAULT_FRONT_HEIGHT)!==(layoutOptions.frontHeight??DEFAULT_FRONT_HEIGHT))setArrays(as=>as.map(a=>a.surface||a.mounting?a:{...a,frontHeight:rules.frontHeight??DEFAULT_FRONT_HEIGHT}));setLayoutOptions(rules);}} disabled={stress||running||layoutAreaOpen}/></section>
+          </>}
           </div>
-          {((areaDrawing||objectDrawing)||panel==='roof'&&hasSelection&&activeSelected)&&<RegionPanel editRequest={elementEditRequest?.roofId===active.id?elementEditRequest:undefined} onEditRequestHandled={()=>setElementEditRequest(null)} creatingRegion={areaDrawing&&drawingIntent==='create'} geometryOnly={areaDrawing} creatingObject={objectDrawing&&objectDraft?{draft:objectDraft,onChange:setObjectDraft,editing:drawingIntent==='reshape-object'}:undefined} region={areaDrawing?drawingDraft??active:active} objectSelection={objectSelection} disabled={running||stress||objectDrawing} onChange={patch=>{if(areaDrawing)setDrawingDraft(d=>({...d??structuredClone(active),...patch}));else setRoofs(rs=>rs.map(r=>r.id===active.id?{...r,...patch}:r));}} onObjectSelectionChange={ids=>{setSelected(null);setSelectedObstacle(ids[0]??null);setPickedObjects(ids.slice(1));}} onAdd={addRegionObject} onDeleteObjects={deleteObjects} onApplyObjectEdit={applyObjectEdit} onApplyObjectArray={applyObjectArray} onPreviewObjectArray={setElementArrayPreview} onUngroupArray={ungroupArray}/>}
+          {((areaDrawing||objectDrawing)||panel==='roof'&&hasSelection&&activeSelected)&&<RegionPanel editRequest={elementEditRequest?.roofId===active.id?elementEditRequest:undefined} onEditRequestHandled={()=>setElementEditRequest(null)} creatingRegion={areaDrawing&&drawingIntent==='create'} geometryOnly={areaDrawing} creatingObject={objectDrawing&&objectDraft?{draft:objectDraft,onChange:setObjectDraft,editing:drawingIntent==='reshape-object'}:undefined} region={areaDrawing?drawingDraft??active:active} objectSelection={objectSelection} disabled={running||stress||objectDrawing||cuttingSpans} onChange={patch=>{if(areaDrawing)setDrawingDraft(d=>({...d??structuredClone(active),...patch}));else setRoofs(rs=>rs.map(r=>r.id===active.id?{...r,...patch}:r));}} onCutSpans={openCutSpans} highlightedSpan={highlightedSpan} onHighlightSpan={setHighlightedSpan} onObjectSelectionChange={ids=>{setSelected(null);setSelectedObstacle(ids[0]??null);setPickedObjects(ids.slice(1));}} onAdd={addRegionObject} onDeleteObjects={deleteObjects} onApplyObjectEdit={applyObjectEdit} onApplyObjectArray={applyObjectArray} onPreviewObjectArray={setElementArrayPreview} onUngroupArray={ungroupArray}/>}
           </div>
 
           {!inlineDrawing&&!collapsed&&panel==='roof'&&fileMessage&&<p role="status" className="file-message panel-toast">{fileMessage}</p>}
-          <div className="design-result sidebar-footer" hidden={collapsed||!hasSelection||!activeSelected||panel!=='layout'}>{fileMessage && <p role="status" className="file-message">{fileMessage}</p>}
+          <div className="design-result sidebar-footer" hidden={collapsed||!hasSelection||!activeSelected||panel!=='layout'||!!active.shadingOnly}>{fileMessage && <p role="status" className="file-message">{fileMessage}</p>}
             <LayoutStatus active={active} arrays={arrays} sunSettings={sunSettings} issues={issues} needsOutline={needsOutline} layoutStale={layoutStale} count={count} capacity={capacity} shadow={shadow}/>
             {startsWithText(layoutMessage,'请检查参数：{0}。组件长宽 0.2–5m，功率 1–2000Wp，平屋面连排 1–{1}，坡屋面 1–6、列数 1–100，间距不得为负。') && <p className="layout-message validation-error" role="status">{layoutMessage}</p>}
 
@@ -849,6 +912,7 @@ function App() {
           {collapsed&&<button className="sidebar-expand-trigger" onClick={()=>setCollapsed(false)} aria-label={tx('展开面板')}><Icon name="chevron-right"/><span>{hasSelection&&activeSelected?active.name:hasSelection?tx('未选中区域'):projectName}</span></button>}
 
           <ViewportTools drawing={inlineDrawing} viewOnly={viewOnly} mode={mode} eyeLevel={eyeLevel} onToggleEyeLevel={coreEdition?undefined:()=>setEyeLevel(v=>!v)} navigationMode={navigationMode} running={running} displayOpen={displayOpen} sunOpen={sunOpen} overlayOpen={overlayOpen}
+            viewRotation={viewRotation} horizonActive={horizonDrawing} onViewRotation={setViewRotation} onToggleHorizon={openHorizonCalibration} onResetRotation={()=>setViewRotation(0)}
             onDownload={downloadLayoutImage} downloadDisabled={stress||!hasSelection}
             downloadGridVisible={showGrid}
             downloadSiteId={hasSelection&&activeSelected?active.id:undefined}
@@ -863,7 +927,7 @@ function App() {
             onToggleDisplay={coreEdition?undefined:()=>{setDisplayOpen(v=>!v);setSunOpen(false);setOverlayOpen(false);}} onToggleSun={()=>{setSunOpen(v=>!v);setDisplayOpen(false);setOverlayOpen(false);}}
             onToggleOverlay={()=>{setOverlayOpen(v=>!v);setDisplayOpen(false);setSunOpen(false);setMode("top");setStress(false);setSelectedOverlay(id=>id??imageOverlays[0]?.id??null);}}
             align={!viewOnly&&hasSelection&&activeSelected&&panel==='roof'?(selectedObstacle?{count:objectSelection.length,keyName:selectedObstacle.name,onAlign:alignObjects}:{count:selection.length,keyName:active.name,onAlign:alignSelection}):undefined}/>
-          <TopRightCluster viewOnly={viewOnly} total={total} regionCount={hasSelection?roofs.length:0} history={history} disabled={importing||saving||running||imageOpen}/>
+          <TopRightCluster viewOnly={viewOnly} total={total} regionCount={hasSelection?roofs.filter(r=>!r.shadingOnly).length:0} history={history} disabled={importing||saving||running||imageOpen}/>
           {overlayOpen&&<ImageOverlayPanel
            mainBase={baseImage&&!baseImage.blank&&baseImage.metersPerPixel?baseImage:undefined}
            onMainBaseChange={patch=>setBaseImage(base=>base&&({...base,...patch}))}
@@ -872,7 +936,7 @@ function App() {
            items={imageOverlays} selected={selectedOverlay} center={hasSelection?{x:active.x,z:active.z}:{x:0,z:0}} initialWidth={hasSelection?active.roof.width:baseImage?.metersPerPixel?baseImage.width*baseImage.metersPerPixel*.35:30} onChange={setImageOverlays} onSelect={setSelectedOverlay} onClose={()=>setOverlayOpen(false)}/>}
           {mode==='3d'&&sunOpen&&<SunPopover showWinterCheck={showWinterCheck} onShowWinterCheck={setShowWinterCheck} sunSettings={sunSettings} onSunSettings={setSunSettings} previewTime={sunPreviewTime} onPreviewTime={setSunPreviewTime} showShadows={showShadows} onShowShadows={setShowShadows} onClose={()=>setSunOpen(false)}/>}
           {!coreEdition&&displayOpen&&<DisplayPopover showGrid={showGrid} onShowGrid={setShowGrid} directionMarkerStyle={directionMarkerStyle} onDirectionMarkerStyle={changeDirectionMarkerStyle} arrayDimensions={arrayDimensions} onArrayDimensions={setArrayDimensions} stressCount={stressCount} onStressCount={setStressCount} backgroundColor={backgroundColor} groundColor={groundColor} quality={quality} guides={guides} stress={stress} running={running} progress={progress} report={report} count={total.count} onBackground={setBackgroundColor} onGround={setGroundColor} onQuality={value=>{setQuality(value);setRun(0);setProgress('');setReport(null);}} onGuides={setGuides} onStartTest={()=>{setMode('3d');setStress(true);setGuides(false);setReport(null);setProgress(tx('第 1/3 轮预热 · 5 秒'));setRun(n=>n+1);}} onStopTest={()=>{setRun(0);setProgress(tx('已停止'));}} onResetTest={()=>{setStress(false);setRun(0);setProgress('');setReset(n=>n+1);}} onClose={()=>setDisplayOpen(false)}/>}
-          <CanvasCompass store={northStore}/>
+          <CanvasCompass store={northStore} viewRotation={mode==='top'?viewRotation:0} onResetRotation={mode==='top'?()=>setViewRotation(0):undefined}/>
           {measureTool&&mode==='top'&&<div className="measure-hint">
            <span role="status">{measureTool==='distance'?tx('点两点测距离 · 按住 Shift 水平/竖直 · Esc 退出'):tx('依次点各角，点回起点或双击结束 · Backspace 撤回一点 · Esc 退出')}</span>
            <button type="button" className="icon-button" title={tx('退出测量')} aria-label={tx('退出测量')} onClick={()=>setMeasureTool(null)}><Icon name="close"/></button>
@@ -885,6 +949,10 @@ function App() {
             fallback={<div className="loading">{tx('正在加载')} {engine}…</div>}
           >
             <View
+              viewRotation={animatedRotation}
+              drawingMode={inlineDrawing&&!horizonDrawing}
+              editingSiteId={(areaDrawing&&drawingIntent==='reshape')||cuttingSpans?active.id:undefined}
+              highlightedSpanIndex={highlightedSpan}
               imageOverlays={imageOverlays} editingOverlay={overlayOpen} selectedOverlayId={selectedOverlay}
               baseImage={baseImage?.metersPerPixel?{...baseImage,frame:baseImage.frame??{x:0,y:0,width:baseImage.width,height:baseImage.height}}:baseImage}
               onCaptureReady={setSceneCapture}
@@ -937,8 +1005,8 @@ function App() {
               onEditObject={id=>{if(!viewOnly&&mode==='top')editCanvasObject(resolvePreviewHit(id)??id);}}
               onObjectMenu={(id,x,y)=>{if(!viewOnly)openCanvasMenu(resolvePreviewHit(id)??id,x,y);}}
               directionMarkerColor={inlineDrawing?undefined:directionMarkerStyle==='hidden'?undefined:directionMarkerColors[directionMarkerStyle]}
-              layoutMarker={directionMarkerStyle!=='hidden'&&panel==='layout'&&hasSelection&&activeSelected&&!selectedObstacle?layoutMarker(active,coreEdition):undefined}
-              showPitchMarker={!inlineDrawing&&directionMarkerStyle!=='hidden'&&panel==='roof'&&hasSelection&&activeSelected&&!selectedObstacle}
+              layoutMarker={directionMarkerStyle!=='hidden'&&panel==='layout'&&hasSelection&&activeSelected&&!selectedObstacle&&!active.shadingOnly?layoutMarker(active,coreEdition):undefined}
+              showPitchMarker={!inlineDrawing&&directionMarkerStyle!=='hidden'&&panel==='roof'&&hasSelection&&activeSelected&&!selectedObstacle&&!active.shadingOnly}
 
               onSelect={(id,add)=>selectOnCanvas(resolvePreviewHit(id??null),add)}
 

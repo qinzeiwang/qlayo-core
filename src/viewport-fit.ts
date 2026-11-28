@@ -1,15 +1,18 @@
 import {corners,fittedPlanView,footprint,geometry,type CameraView,type Obstacle,type PVArray,type Rect,type SceneSite} from './domain';
-import {roofHeight} from './pitched-roof';
+import {maxRoofHeight} from './pitched-roof';
 
-export function fitPlanImage(aspect:number,sites:SceneSite[],obstacles:Obstacle[],arrays:PVArray[]){
+export function fitPlanImage(aspect:number,sites:SceneSite[],obstacles:Obstacle[],arrays:PVArray[],viewRotation=0){
  const laidOutSiteIds=new Set(arrays.map(array=>array.id.split('/')[0]));
  const outlines=[...sites.filter(site=>!site.carport||!laidOutSiteIds.has(site.id)),...obstacles,...arrays.map(footprint)];
- let minX=Infinity,minZ=Infinity,maxX=-Infinity,maxZ=-Infinity;
+ const rad=viewRotation*Math.PI/180,c=Math.cos(rad),s=Math.sin(rad);
+ let minU=Infinity,minV=Infinity,maxU=-Infinity,maxV=-Infinity;
  for(const rect of outlines)for(const {x,z} of corners(rect)){
-  minX=Math.min(minX,x);minZ=Math.min(minZ,z);maxX=Math.max(maxX,x);maxZ=Math.max(maxZ,z);
+  const u=x*c-z*s,v=x*s+z*c;
+  minU=Math.min(minU,u);minV=Math.min(minV,v);maxU=Math.max(maxU,u);maxV=Math.max(maxV,v);
  }
- if(!Number.isFinite(minX))return;
- return fittedPlanView({x:(minX+maxX)/2,z:(minZ+maxZ)/2},{width:maxX-minX,depth:maxZ-minZ},aspect);
+ if(!Number.isFinite(minU))return;
+ const cu=(minU+maxU)/2,cv=(minV+maxV)/2;
+ return fittedPlanView({x:cu*c+cv*s,z:-cu*s+cv*c},{width:maxU-minU,depth:maxV-minV},aspect);
 }
 
 export function fitOrbitView(view:CameraView,aspect:number,fov:number,sites:SceneSite[],obstacles:Obstacle[],arrays:PVArray[]){
@@ -20,8 +23,7 @@ export function fitOrbitView(view:CameraView,aspect:number,fov:number,sites:Scen
  const ground=-3.5;
  for(const site of sites){
   const {pitch,carport}=site;
-  const top=pitch?roofHeight(site,pitch,pitch.high*site.width/2,pitch.high*site.depth/2):undefined;
-  const roofTop=pitch?.kind==='gable'?roofHeight(site,pitch,0,0):top??ground+(site.flatHeight??3.5);
+  const roofTop=pitch?maxRoofHeight(site,pitch):ground+(site.flatHeight??3.5);
   add(site,ground,carport?ground+carport.clearance+.25:roofTop+site.wallHeight);
  }
  for(const object of obstacles)if(object.kind!=='keepout')add(object,object.baseHeight??0,(object.baseHeight??0)+object.height);

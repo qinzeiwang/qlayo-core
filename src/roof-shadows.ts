@@ -3,9 +3,11 @@ import {layoutAreaIssues} from './layout-area';
 import {carportBoundary} from './carport';
 import {corners,detect,DEFAULT_FRONT_HEIGHT,PITCHED_PANEL_OFFSET,type Point} from './domain';
 import {gableParapetPlan} from './gable-parapet';
-import {neighborRoofShadowZones,neighborShadowCasters} from './neighbor-shadows';
+import {gableOuterLoop,gableSelfShadowCasters} from './gable-geometry';
+import {insetRoof} from './flat-roof-shell';
+import {layoutShadowSources,neighborRoofShadowZones,neighborShadowCasters} from './neighbor-shadows';
 import {cross,insidePolygon} from './polygon';
-import {roofHeight} from './pitched-roof';
+import {gableSpans,roofHeight} from './pitched-roof';
 import {pitchedShadowZones} from './pitched-shadow-zones';
 import {geographicYaw,toWorld,type RoofDesign} from './roof-project';
 import {shadowZones,type ShadowZone} from './shadow-zones';
@@ -27,10 +29,11 @@ export function worldShadowZones(roofs:RoofDesign[],rays:readonly SunRay[]){
 }
 /** Conflicts on all roofs for the canvas; ids are prefixed with the roof id. */
 export function worldIssues(roofs:RoofDesign[],rays:readonly SunRay[],includeNeighbors=true){
+ const sources=layoutShadowSources(roofs,includeNeighbors);
  return roofs.flatMap(r=>{
   const issues=[...layoutAreaIssues(r.arrays,r.layoutOptions),...detect(r.arrays,r.obstacles,carportBoundary(r.roof,r.carport,r.layoutOptions.portrait))];
   if(rays.length){
-   const model=createRoofOcclusion(r,rays,includeNeighbors?roofs:[]);
+   const model=createRoofOcclusion(r,rays,sources);
    for(const array of r.arrays)for(const zone of model.regions(array)){
     issues.push({kind:'shadow',ids:[array.id],text:zone.name});
    }
@@ -40,7 +43,8 @@ export function worldIssues(roofs:RoofDesign[],rays:readonly SunRay[],includeNei
 }
 /** Actual shaded module surfaces, rather than a shadow mask on the roof below. */
 export function worldPanelShadowZones(roofs:RoofDesign[],rays:readonly SunRay[],includeNeighbors=true){
- return roofs.flatMap(r=>{const model=createRoofOcclusion(r,rays,includeNeighbors?roofs:[]);return r.arrays.flatMap(a=>model.regions(a).map(z=>({...z,id:`${r.id}/${a.id}/${z.id}`,points:z.points.map(p=>toWorld(p,r))})));});
+ const sources=layoutShadowSources(roofs,includeNeighbors);
+ return roofs.flatMap(r=>{const model=createRoofOcclusion(r,rays,sources);return r.arrays.flatMap(a=>model.regions(a).map(z=>({...z,id:`${r.id}/${a.id}/${z.id}`,points:z.points.map(p=>toWorld(p,r))})));});
 }
 
 /** Portion of an edge covered by another counterclockwise convex shadow. */
@@ -66,7 +70,8 @@ function winterBoundary(roof:RoofDesign,rays:readonly SunRay[],roofs:readonly Ro
  const samples=new Map<string,Point[][]>();
  const frontHeight=roof.pitch?PITCHED_PANEL_OFFSET:roof.layoutOptions.frontHeight??DEFAULT_FRONT_HEIGHT;
  const hasGableParapet=roof.pitch?.kind==='gable'&&roof.wallHeight>0;
- const neighbors=neighborShadowCasters(roof,roofs,rays);
+ const selfCasters=roof.pitch?.kind==='gable'&&roof.pitch.spans&&roof.pitch.spans.length>1?gableSelfShadowCasters(roof.roof,roof.pitch,tx('相邻坡面')):[];
+ const neighbors=[...neighborShadowCasters(roof,roofs,rays),...selfCasters];
  for(const ray of rays){
   for(const zone of [...roofShadowZones(roof,[ray],frontHeight),...neighborRoofShadowZones(roof,neighbors,[ray],frontHeight)]){
    // Treat the four connected sides as one shadow when outlining the envelope.
@@ -99,12 +104,15 @@ function winterBoundary(roof:RoofDesign,rays:readonly SunRay[],roofs:readonly Ro
 /** Roof-local winter envelope boundaries, clipped to the footprint and draped over the ridge. */
 export function winterCheckLines(roofs:RoofDesign[],rays:readonly SunRay[],includeNeighbors=true){
  const positions:number[]=[];
+ const sources=layoutShadowSources(roofs,includeNeighbors);
  for(const roof of roofs){
+  if(roof.shadingOnly)continue;
   const pitch=roof.pitch;
   const footprint=pitch?.kind==='gable'&&roof.wallHeight>0
-   ?gableParapetPlan(roof.roof,pitch,roof.wallHeight).deck
+   ?(roof.roof.outline||pitch.spans?insetRoof(gableOuterLoop(roof.roof),.2).inner:gableParapetPlan(roof.roof,pitch,roof.wallHeight).deck)
    :corners({...roof.roof,x:0,z:0,yaw:0});
-  for(const [a,b] of winterBoundary(roof,rays,includeNeighbors?roofs:[])){
+  const breaks=pitch?.kind==='gable'?gableSpans(roof.roof,pitch).flatMap(s=>[s.start,(s.start+s.end)/2,s.end]):[];
+  for(const [a,b] of winterBoundary(roof,rays,sources)){
    const dx=b.x-a.x,dz=b.z-a.z;
    const cuts=[0,1];
    for(let j=0;j<footprint.length;j++){
@@ -114,8 +122,9 @@ export function winterCheckLines(roofs:RoofDesign[],rays:readonly SunRay[],inclu
     const x=c.x-a.x,z=c.z-a.z,t=(x*ez-z*ex)/den,u=(x*dz-z*dx)/den;
     if(t>0&&t<1&&u>=0&&u<=1)cuts.push(t);
    }
-   if(pitch?.kind==='gable'&&a[pitch.axis]*b[pitch.axis]<0){
-    cuts.push(a[pitch.axis]/(a[pitch.axis]-b[pitch.axis]));
+   if(pitch?.kind==='gable'){
+    const va=a[pitch.axis],vb=b[pitch.axis],dv=vb-va;
+    if(Math.abs(dv)>1e-9)for(const br of breaks){const t=(br-va)/dv;if(t>0&&t<1)cuts.push(t);}
    }
    cuts.sort((a,b)=>a-b);
    const at=(t:number)=>({x:a.x+t*dx,z:a.z+t*dz});

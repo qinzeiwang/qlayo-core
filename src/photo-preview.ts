@@ -7,6 +7,7 @@ import {channelGeometry,instanceData,panelTexture} from './realistic';
 import {referenceCells,referenceGlass} from './pv-material';
 import {sunPosition} from './sun-position';
 import {photoRoofVertices,photoRoofArrays,photoRoofObjects} from './photo-roof';
+import {gableCustomShell} from './gable-geometry';
 import {fitPhotoCamera} from './photo-camera';
 import {GROUND,solvePhotoCamera,solvePointCamera,type PhotoCamera} from './photo-solve';
 import {carportMeshes} from './carport-parts';
@@ -75,10 +76,15 @@ function siteSetup(m:PhotoView,roofs:RoofDesign[],options:PhotoRenderOptions,nor
    }else{
     const top=r.pitch?r.pitch.eave-3.5:(r.flatHeight??3.5)-3.5;
     // Keep the walls for depth occlusion. The actual roof is the receiver.
-    stage.surface(footprintSurface(outline,top,GROUND),undefined,0,false);
+    if(r.pitch?.kind==='gable'&&(r.pitch.spans||r.roof.outline)){
+     const walls=new T.BufferGeometry();
+     walls.setAttribute('position',new T.Float32BufferAttribute(gableCustomShell(r.roof,r.pitch,0).walls,3));
+     walls.computeVertexNormals();
+     stage.surface(walls,new T.Vector3(r.x,0,r.z),r.yaw,false);
+    }else stage.surface(footprintSurface(outline,top,GROUND),undefined,0,false);
     if(r.pitch){
      const roof=new T.BufferGeometry();
-     roof.setAttribute('position',new T.BufferAttribute(photoRoofVertices(r.roof.width,r.roof.depth,r.pitch),3));
+     roof.setAttribute('position',new T.BufferAttribute(photoRoofVertices(r.roof.width,r.roof.depth,r.pitch,r.roof.outline),3));
      roof.computeVertexNormals();
      stage.surface(roof,new T.Vector3(r.x,top,r.z),r.yaw);
     }else stage.surface(footprintSurface(outline,top));

@@ -19,6 +19,11 @@ const roofPaths:Record<string,string>={
  'flat-roof':'M3 8h18 M5 8v12h14V8 M3 5h18',
  'single-roof':'M3 10l18 -5 M5 9.5v10.5h14V5.5',
  'gable-roof':'M3 11l9 -7l9 7 M5 10v10h14V10',
+ 'multi-gable-roof':'M2 12l5 -5l5 5l5 -5l5 5 M4 11v9h16v-9',
+ 'obstacle-building':'M4 20h16 M6 20V5h12v15 M6 10l5 -5 M6 16l11 -11 M10 20l8 -8',
+ 'level-view':'M4.5 9.5a1.5 1.5 0 0 1 1.5 -1.5h8a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1 -1.5 1.5h-8a1.5 1.5 0 0 1 -1.5 -1.5z M10 4a8 8 0 0 1 9.5 7.8 M17.2 9.5l2.3 2.5l2.2 -2.6',
+ 'horizon-pick':'M3 18h18 M6 13l12 -7 M6 13a1.2 1.2 0 1 0 0 .01 M18 6a1.2 1.2 0 1 0 0 .01',
+ 'cut-roof':'M4 5h16v14H4z M12 3v18 M8.5 9.5l-2 2.5l2 2.5 M15.5 9.5l2 2.5l-2 2.5',
  // Top views of the roof; arrows point down the slope.
  'ridge-direction':'M4 5.5a1.5 1.5 0 0 1 1.5 -1.5h13a1.5 1.5 0 0 1 1.5 1.5v13a1.5 1.5 0 0 1 -1.5 1.5h-13a1.5 1.5 0 0 1 -1.5 -1.5z M4 12h16 M10 9l2 -2l2 2 M10 15l2 2l2 -2',
  'slope-direction':'M4 6a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z M12 8v8 M9 13l3 3l3 -3',

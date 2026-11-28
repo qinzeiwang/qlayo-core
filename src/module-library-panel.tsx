@@ -1,8 +1,8 @@
 import {newId} from './ids';
 import {useCallback,useEffect,useState} from 'react';
-import {defaultModule,validModule} from './domain';
+import {validModule} from './domain';
 import {Icon} from './workbench-ui';
-import {isBuiltInModule,projectDefaultModule,type ModuleCatalogItem} from './module-library';
+import {defaultSharedModule,projectDefaultModule,type ModuleCatalogItem} from './module-library';
 import {readModuleLibrary,sameLibraryModule,setModuleShared} from './saved-module-library';
 import './module-library-panel.css';
 import {tx} from './i18n';
@@ -26,11 +26,10 @@ export function ModuleLibraryPanel({items,usedIds,onChange}:Props){
  const [library,setLibrary]=useState(()=>readModuleLibrary());
  const onDirty=useCallback((_id:string,value:boolean)=>setDirty(value),[]);
  const selected=items.find(i=>i.id===selectedId)??items[0];
- const scope=(item:ModuleCatalogItem)=>isBuiltInModule(item)?'built-in'
-  :library.items.some(entry=>sameLibraryModule(entry,item))?'shared':'project';
+ const scope=(item:ModuleCatalogItem)=>library.items.some(entry=>sameLibraryModule(entry,item))?'shared':'project';
  const selectedScope=scope(selected);
  const groups=[
-  ['built-in',tx('内置规格')],['shared',tx('公用规格')],['project',tx('项目规格')],
+  ['shared',tx('公用规格')],['project',tx('项目规格')],
  ] as const;
  const apply=(next:ModuleCatalogItem[])=>{const failure=onChange(next);setError(failure??'');return !failure;};
  function changeSharing(){
@@ -38,7 +37,7 @@ export function ModuleLibraryPanel({items,usedIds,onChange}:Props){
   catch(error){setError(error instanceof Error?error.message:tx('公用组件库保存失败'));}
  }
  function add(){
-  const item={id:newId(),name:tx('新组件 ')+(items.length+1),spec:{...(selected?.spec??defaultModule)}};
+  const item={id:newId(),name:tx('新组件 ')+(items.length+1),spec:{...(selected?.spec??defaultSharedModule)}};
   if(apply([...items,item]))setSelectedId(item.id);
  }
  return <div className="module-library-layout">
@@ -56,7 +55,7 @@ export function ModuleLibraryPanel({items,usedIds,onChange}:Props){
   <section className="module-library-editor"><h3>{tx('组件信息')}</h3>
    <LibraryItem key={selected.id} item={selected} used={usedIds.has(selected.id)} onDirty={onDirty} onApply={next=>onChange(items.map(i=>i.id===next.id?next:i))}/>
    <div className="module-library-actions">
-    {selectedScope!=='built-in'&&<button type="button" disabled={dirty} title={tx('公用规格可在本浏览器的新项目中使用')} onClick={changeSharing}>{selectedScope==='shared'?tx('移出公用库'):tx('加入公用库')}</button>}
+    <button type="button" disabled={dirty||(selectedScope==='shared'&&library.items.length<=1)} title={tx('公用规格可在本浏览器的新项目中使用')} onClick={changeSharing}>{selectedScope==='shared'?tx('移出公用库'):tx('加入公用库')}</button>
     <button className="default-module-action" disabled={dirty||items[0].id===selected.id} onClick={()=>apply([selected,...items.filter(i=>i.id!==selected.id)])}>{items[0].id===selected.id?tx('项目默认组件'):tx('设为默认组件')}</button>
    </div>
    {error&&<p role="alert">{error}</p>}

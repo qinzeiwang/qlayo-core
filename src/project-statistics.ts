@@ -1,4 +1,5 @@
 import {footprintArea} from './polygon';
+import {gableSlopeArea} from './gable-geometry';
 import {defaultModule,geometry,type PVArray,type ModuleSpec} from './domain';
 import {worldArray,type RoofDesign} from './roof-project';
 import {tx} from './i18n';
@@ -11,13 +12,13 @@ export function panelOrientation(a:PVArray){
 export type GenerationGroup={module:ModuleSpec;tilt:number;azimuth:number|null;count:number;capacity:number;roofCapacity:number;carportCapacity:number;regions:string[]};
 export function projectStatistics(roofs:RoofDesign[]){
  const groups=new Map<string,GenerationGroup>();
- const regions=roofs.map(r=>{
+ const regions=roofs.filter(r=>!r.shadingOnly).map(r=>{
   let count=0,capacity=0,moduleArea=0,occupiedArea=0,carportArea=0,standardCapacity=0,lightweightCapacity=0;
   const wings=new Map<string,{area:number;depth:number;number:number;gap:number}>();
   for(const a of r.arrays){
    const m=a.module??defaultModule,n=a.rows*a.columns,kw=n*m.power/1000,o=panelOrientation({...worldArray(a,r),azimuth:worldArray(a,r).azimuth-(r.northAngle??0)}),g=geometry(a);
    if(m.kind==='lightweight')lightweightCapacity+=kw;else standardCapacity+=kw;
-   count+=n;capacity+=kw;moduleArea+=n*m.width*m.length*o.projection;occupiedArea+=n*m.width*m.length*o.projection*(a.hostObstacleId?1:Math.sqrt(1+((r.pitch?.percent??0)/100)**2));
+   count+=n;capacity+=kw;moduleArea+=n*m.width*m.length*o.projection;occupiedArea+=n*m.width*m.length*o.projection*(a.hostObstacleId?1:a.surface?Math.sqrt(1+a.surface.sx**2+a.surface.sz**2):Math.sqrt(1+((r.pitch?.percent??0)/100)**2));
    if(r.carport){
     carportArea+=g.width*g.depth;
     if(r.carport.double){const key=JSON.stringify([a.azimuth,a.rows,a.azimuth===270?a.x:a.z]);const entry=wings.get(key)??{area:0,depth:g.depth,number:0,gap:m.gap/Math.sqrt(1+(a.surface?.sx??0)**2)};entry.number++;wings.set(key,entry);}
@@ -30,7 +31,8 @@ export function projectStatistics(roofs:RoofDesign[]){
   }
   for(const w of wings.values())if(w.number===2)carportArea+=w.depth*w.gap;
   const roofArea=r.carport?0:footprintArea(r.roof);
-  return {id:r.id,name:r.name,type:r.carport?(r.carport.double?tx('双排车棚'):tx('单排车棚')):r.pitch?(r.pitch.kind==='gable'?tx('双坡屋面'):tx('单坡屋面')):tx('平屋面'),isCarport:!!r.carport,roofArea,slopeArea:roofArea*Math.sqrt(1+((r.pitch?.percent??0)/100)**2),moduleArea,occupiedArea,carportArea,count,capacity,standardCapacity,lightweightCapacity};
+  const slopeArea=r.carport?0:r.pitch?.kind==='gable'?gableSlopeArea(r.roof,r.pitch):roofArea*Math.sqrt(1+((r.pitch?.percent??0)/100)**2);
+  return {id:r.id,name:r.name,type:r.carport?(r.carport.double?tx('双排车棚'):tx('单排车棚')):r.pitch?(r.pitch.kind==='gable'?(r.pitch.spans?tx('连坡屋面'):tx('双坡屋面')):tx('单坡屋面')):tx('平屋面'),isCarport:!!r.carport,roofArea,slopeArea,moduleArea,occupiedArea,carportArea,count,capacity,standardCapacity,lightweightCapacity};
  });
  const total=regions.reduce((s,r)=>({slopeArea:s.slopeArea+r.slopeArea,occupiedArea:s.occupiedArea+(r.isCarport?0:r.occupiedArea),standardCapacity:s.standardCapacity+r.standardCapacity,lightweightCapacity:s.lightweightCapacity+r.lightweightCapacity,roofArea:s.roofArea+r.roofArea,moduleArea:s.moduleArea+(r.isCarport?0:r.moduleArea),carportArea:s.carportArea+r.carportArea,roofCapacity:s.roofCapacity+(r.isCarport?0:r.capacity),carportCapacity:s.carportCapacity+(r.isCarport?r.capacity:0),capacity:s.capacity+r.capacity,count:s.count+r.count}),{slopeArea:0,occupiedArea:0,standardCapacity:0,lightweightCapacity:0,roofArea:0,moduleArea:0,carportArea:0,roofCapacity:0,carportCapacity:0,capacity:0,count:0});
  return {total,regions,groups:[...groups.values()].sort((a,b)=>a.tilt-b.tilt||(a.azimuth??-1)-(b.azimuth??-1)||a.module.power-b.module.power)};

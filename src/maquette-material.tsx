@@ -4,15 +4,15 @@ export const MaquetteSunContext=createContext({x:-.5,y:.8,z:-.4});
 /** Stable, neutral face shading used only by the design canvas, not delivery rendering.
  * Works for boxes, pitched walls and extruded footprints without changing geometry groups.
  */
-export function MaquetteWallMaterial({doubleSide=false}:{doubleSide?:boolean}) {
+export function MaquetteWallMaterial({doubleSide=false,shading=false}:{doubleSide?:boolean;shading?:boolean}) {
  const sun=useContext(MaquetteSunContext);
  const material=useMemo(()=>{
   const m=new THREE.MeshBasicMaterial({color:'#ffffff',toneMapped:false,polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1,side:doubleSide?THREE.DoubleSide:THREE.FrontSide});
   m.onBeforeCompile=shader=>{
    shader.uniforms.studySun={value:new THREE.Vector3(sun.x,sun.y,sun.z).normalize()};
-   shader.uniforms.studyLight={value:new THREE.Color('#dededb')};
-   shader.uniforms.studyDark={value:new THREE.Color('#a2a4a2')};
-   shader.uniforms.studyTop={value:new THREE.Color('#fafbf9')};
+   shader.uniforms.studyLight={value:new THREE.Color(shading?'#aeb6c0':'#dededb')};
+   shader.uniforms.studyDark={value:new THREE.Color(shading?'#7d8692':'#a2a4a2')};
+   shader.uniforms.studyTop={value:new THREE.Color(shading?'#c5ccd4':'#fafbf9')};
    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vStudyNormal;').replace('void main() {','void main() {\nvStudyNormal=mat3(modelMatrix)*normal;');
    shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vStudyNormal;\nuniform vec3 studySun;\nuniform vec3 studyLight;\nuniform vec3 studyDark;\nuniform vec3 studyTop;').replace('#include <color_fragment>',`#include <color_fragment>
     vec3 studyNormal=normalize(vStudyNormal);
@@ -25,9 +25,9 @@ export function MaquetteWallMaterial({doubleSide=false}:{doubleSide?:boolean}) {
     diffuseColor.rgb=studyColor;
    `);
   };
-  m.customProgramCacheKey=()=> 'pvlane-sun-maquette-v2';
+  m.customProgramCacheKey=()=>shading?'pvlane-sun-maquette-shading-v2':'pvlane-sun-maquette-v2';
   return m;
- },[doubleSide,sun.x,sun.y,sun.z]);
+ },[doubleSide,shading,sun.x,sun.y,sun.z]);
  useEffect(()=>()=>material.dispose(),[material]);
  return <primitive object={material} attach="material"/>;
 }

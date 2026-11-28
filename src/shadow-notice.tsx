@@ -2,14 +2,16 @@ import type {RoofDesign} from './roof-project';
 import type {SunSettings} from './sun-position';
 import {ignoresShadows,locationMismatch} from './location-presets';
 import {layoutSignatureFor,type Edges} from './layout-state';
+import {layoutShadowSources} from './neighbor-shadows';
 import {winterRays} from './solar';
 import {Icon} from './workbench-ui';
 import {tx} from './i18n';
-export function shadowNotice(s:SunSettings,roofs:RoofDesign[],edge:Edges=.5){
- const relevant=roofs.filter(r=>!r.carport&&(!r.pitch||r.obstacles.some(o=>o.kind!=='keepout')));
+export function shadowNotice(s:SunSettings,roofs:RoofDesign[],edge:Edges=.5,includeNeighbors=false){
+ const sources=layoutShadowSources(roofs,includeNeighbors);
+ const relevant=roofs.filter(r=>!r.carport&&!r.shadingOnly&&(!r.pitch||r.obstacles.some(o=>o.kind!=='keepout')));
  if(!relevant.length)return undefined;
  // A roof with no panels yet has nothing to check, so only a missing location or polar night warns there.
- const affected=relevant.filter(r=>ignoresShadows(s)||!winterRays(s.latitude).length||(r.arrays.length>0&&(r.layoutOptions.shadowIgnored||r.layoutOptions.shadowLatitude!==s.latitude||r.layoutSignature!==layoutSignatureFor(r,edge))));
+ const affected=relevant.filter(r=>ignoresShadows(s)||!winterRays(s.latitude).length||(r.arrays.length>0&&(r.layoutOptions.shadowIgnored||r.layoutOptions.shadowLatitude!==s.latitude||r.layoutSignature!==layoutSignatureFor(r,edge,sources))));
  if(!affected.length)return undefined;
  const names=affected.slice(0,3).map(r=>r.name).join('、')+(affected.length>3?tx('等 {0} 个屋面',affected.length):'');
  const reason=ignoresShadows(s)?tx('尚未确定项目坐标，必须补充地点或经纬度'):!winterRays(s.latitude).length?tx('所在地冬至无有效日照，当前校核时段不适用'):tx('尚未完成或需要更新当前参数的布置校核');

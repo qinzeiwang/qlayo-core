@@ -5,6 +5,8 @@ import {en} from './i18n-en';
 
 export type ModuleCatalogItem={id:string;name:string;spec:ModuleSpec};
 export const standardModuleId='module-standard-default';
+/** Default shared library module (mainstream 660 Wp standard panel). */
+export const defaultSharedModule:ModuleSpec={kind:'standard',width:1.134,length:2.382,power:660,gap:.02};
 export function projectDefaultModule(items:ModuleCatalogItem[],standardOnly:boolean){
  return items.find(item=>!standardOnly||item.spec.kind!=='lightweight');
 }
@@ -13,21 +15,20 @@ export const lightweightModuleId='module-lightweight-default';
 
 export function defaultModuleCatalog():ModuleCatalogItem[]{
  return [
-  {id:standardModuleId,name:tx('标准组件 {0} Wp',defaultModule.power),spec:{...defaultModule,kind:'standard'}},
-  {id:lightweightModuleId,name:tx('轻质组件 {0} Wp',lightModule.power),spec:{...lightModule,kind:'lightweight'}},
+  {id:standardModuleId,name:tx('标准组件 {0} Wp',defaultSharedModule.power),spec:{...defaultSharedModule}},
  ];
 }
 
 export const sameModule=(a:ModuleSpec,b:ModuleSpec)=>
  (a.kind??'standard')===(b.kind??'standard')&&a.power===b.power&&a.length===b.length&&a.width===b.width&&a.gap===b.gap;
 
-/** Modified copies belong to their project, including copies from older files. */
-export function isBuiltInModule(item:ModuleCatalogItem){
+/** Legacy unmodified built-in modules (550 Wp standard / 560 Wp lightweight) kept only for storage migration. */
+export function isLegacyBuiltInModule(item:ModuleCatalogItem){
  const standard=item.id===standardModuleId;
  if(!standard&&item.id!==lightweightModuleId)return false;
  const spec=standard?defaultModule:lightModule;
- const name=standard?'标准组件 {0} Wp':'轻质组件 {0} Wp';
- return sameModule(item.spec,spec)&&[name,en[name]].some(template=>item.name===template.replace('{0}',String(spec.power)));
+ const names=standard?['标准组件 {0} Wp',en['标准组件 {0} Wp']]:['轻质组件 {0} Wp','Lightweight module {0} Wp'];
+ return sameModule(item.spec,spec)&&names.some(template=>item.name===template.replace('{0}',String(spec.power)));
 }
 
 export function catalogFromModules(modules:ModuleSpec[]):ModuleCatalogItem[]{
