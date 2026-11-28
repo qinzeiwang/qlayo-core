@@ -23,7 +23,7 @@ import {PatternButton} from './area-arrange';
 import {usePhone} from './use-phone';
 import {RegionBar} from './region-bar';
 import {useWorkspaceMenus} from './use-workspace-menus';
-import {ViewportTools,TopRightCluster} from './viewport-tools';
+import {ViewportTools,CanvasHistory,CanvasOverview} from './viewport-tools';
 import {sunPosition} from './sun-position';
 import { GlobalSettingsDialog, type GlobalSettingsTab } from './system-settings';
 import type {ElementArrayPreview,ElementArraySpec} from './element-list';
@@ -927,7 +927,7 @@ function App() {
             onToggleDisplay={coreEdition?undefined:()=>{setDisplayOpen(v=>!v);setSunOpen(false);setOverlayOpen(false);}} onToggleSun={()=>{setSunOpen(v=>!v);setDisplayOpen(false);setOverlayOpen(false);}}
             onToggleOverlay={()=>{setOverlayOpen(v=>!v);setDisplayOpen(false);setSunOpen(false);setMode("top");setStress(false);setSelectedOverlay(id=>id??imageOverlays[0]?.id??null);}}
             align={!viewOnly&&hasSelection&&activeSelected&&panel==='roof'?(selectedObstacle?{count:objectSelection.length,keyName:selectedObstacle.name,onAlign:alignObjects}:{count:selection.length,keyName:active.name,onAlign:alignSelection}):undefined}/>
-          <TopRightCluster viewOnly={viewOnly} total={total} regionCount={hasSelection?roofs.filter(r=>!r.shadingOnly).length:0} history={history} disabled={importing||saving||running||imageOpen}/>
+          {!viewOnly&&<CanvasHistory history={history} disabled={importing||saving||running||imageOpen}/>}
           {overlayOpen&&<ImageOverlayPanel
            mainBase={baseImage&&!baseImage.blank&&baseImage.metersPerPixel?baseImage:undefined}
            onMainBaseChange={patch=>setBaseImage(base=>base&&({...base,...patch}))}
@@ -936,7 +936,10 @@ function App() {
            items={imageOverlays} selected={selectedOverlay} center={hasSelection?{x:active.x,z:active.z}:{x:0,z:0}} initialWidth={hasSelection?active.roof.width:baseImage?.metersPerPixel?baseImage.width*baseImage.metersPerPixel*.35:30} onChange={setImageOverlays} onSelect={setSelectedOverlay} onClose={()=>setOverlayOpen(false)}/>}
           {mode==='3d'&&sunOpen&&<SunPopover showWinterCheck={showWinterCheck} onShowWinterCheck={setShowWinterCheck} sunSettings={sunSettings} onSunSettings={setSunSettings} previewTime={sunPreviewTime} onPreviewTime={setSunPreviewTime} showShadows={showShadows} onShowShadows={setShowShadows} onClose={()=>setSunOpen(false)}/>}
           {!coreEdition&&displayOpen&&<DisplayPopover showGrid={showGrid} onShowGrid={setShowGrid} directionMarkerStyle={directionMarkerStyle} onDirectionMarkerStyle={changeDirectionMarkerStyle} arrayDimensions={arrayDimensions} onArrayDimensions={setArrayDimensions} stressCount={stressCount} onStressCount={setStressCount} backgroundColor={backgroundColor} groundColor={groundColor} quality={quality} guides={guides} stress={stress} running={running} progress={progress} report={report} count={total.count} onBackground={setBackgroundColor} onGround={setGroundColor} onQuality={value=>{setQuality(value);setRun(0);setProgress('');setReport(null);}} onGuides={setGuides} onStartTest={()=>{setMode('3d');setStress(true);setGuides(false);setReport(null);setProgress(tx('第 1/3 轮预热 · 5 秒'));setRun(n=>n+1);}} onStopTest={()=>{setRun(0);setProgress(tx('已停止'));}} onResetTest={()=>{setStress(false);setRun(0);setProgress('');setReset(n=>n+1);}} onClose={()=>setDisplayOpen(false)}/>}
-          <CanvasCompass store={northStore} viewRotation={mode==='top'?viewRotation:0} onResetRotation={mode==='top'?()=>setViewRotation(0):undefined}/>
+          <div className="canvas-bottom-controls">
+           <CanvasOverview total={total} regionCount={hasSelection?roofs.filter(r=>!r.shadingOnly).length:0}/>
+           <CanvasCompass store={northStore} viewRotation={mode==='top'?viewRotation:0} onResetRotation={mode==='top'?()=>setViewRotation(0):undefined}/>
+          </div>
           {measureTool&&mode==='top'&&<div className="measure-hint">
            <span role="status">{measureTool==='distance'?tx('点两点测距离 · 按住 Shift 水平/竖直 · Esc 退出'):tx('依次点各角，点回起点或双击结束 · Backspace 撤回一点 · Esc 退出')}</span>
            <button type="button" className="icon-button" title={tx('退出测量')} aria-label={tx('退出测量')} onClick={()=>setMeasureTool(null)}><Icon name="close"/></button>

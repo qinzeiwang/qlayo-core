@@ -603,7 +603,7 @@ input[type=checkbox],input[type=radio],input[type=range]{accent-color:var(--pv-a
 .image-editor-embedded:is([data-outline-editing],[data-carport-drawing]) .drawing-status:not([hidden]){display:block;bottom:18px;top:auto;left:50%;transform:translateX(-50%);z-index:2}
 .image-editor.image-editor-embedded .image-tools .icon-button{position:relative;width:30px;min-width:30px;height:30px!important;min-height:30px;flex:0 0 30px;border-radius:4px!important}
 .image-editor-embedded .image-tools .icon-button[data-tooltip]:is(:hover,:focus-visible)::after{content:attr(data-tooltip);position:absolute;left:calc(100% + 10px);right:auto;top:50%;transform:translateY(-50%);z-index:90;white-space:nowrap;pointer-events:none;padding:4px 8px;border-radius:5px;background:var(--pv-accent);color:var(--pv-text-inverse);font:400 12px/18px var(--pv-font-sans);box-shadow:var(--pv-shadow-float)}
-.workspace-forma.is-drawing .top-right-cluster{z-index:21}
+.workspace-forma.is-drawing .history-pill{z-index:21}
 @media(max-height:480px){.image-editor.image-editor-embedded .grouped-drawing-tools{top:64px;gap:0}.image-editor-embedded .image-tools .drawing-tool-group{gap:0;padding-bottom:4px;margin-bottom:2px}.image-editor-embedded .drawing-exit-actions{gap:0}}
 
 /* Step 2 Layout Inspector inside 272px Drawer */
@@ -664,7 +664,7 @@ input[type=checkbox],input[type=radio],input[type=range]{accent-color:var(--pv-a
 .sidebar-footer .run-actions .all-layout.icon-action:hover:not(:disabled){background:var(--pv-surface-hover)!important}
 
 /* 3. Spatial Canvas Viewport & Floating Islands */
-.workspace-forma .viewport{position:relative;inset:auto;flex:1;min-width:0;height:100%;overflow:hidden;background:var(--pv-bg);container:workbench-viewport/inline-size}
+.workspace-forma .viewport{position:relative;inset:auto;flex:1;min-width:0;height:100%;overflow:hidden;background:var(--pv-bg);container:workbench-viewport/inline-size;--canvas-bottom-size:32px;--canvas-bottom-inset:16px;--canvas-bottom-offset:16px}
 /* Keep the previous WebGL frame centered while the renderer catches up with a drawer resize. */
 .workspace-forma .workbench-canvas canvas{position:absolute;top:0;left:50%;transform:translateX(-50%)}
 .workspace-forma .viewport .sidebar-expand-trigger{position:absolute;left:14px;top:14px;z-index:20;height:40px;padding:0 12px 0 8px;border:0;border-radius:8px;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);box-shadow:var(--pv-shadow-island);display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--pv-text)}
@@ -679,23 +679,30 @@ input[type=checkbox],input[type=radio],input[type=range]{accent-color:var(--pv-a
 .workspace-forma .canvas-island .icon-button .ui-icon[data-icon]{width:16px!important;height:16px!important}
 .workspace-forma .canvas-island .icon-button.active{background:var(--pv-accent-soft)!important;color:var(--pv-accent)!important}
 
-.top-right-cluster{position:absolute;top:14px;right:16px;z-index:20;display:flex;align-items:center;gap:8px}
-.kpi-pill,.history-pill{height:40px;padding:0 14px;border-radius:8px;background:rgba(255,255,255,.92);backdrop-filter:blur(16px);box-shadow:var(--pv-shadow-island);display:flex;align-items:center;gap:10px}
-.history-pill{padding:4px;gap:2px}
+.canvas-bottom-controls{position:absolute;right:var(--canvas-bottom-inset);bottom:var(--canvas-bottom-offset);z-index:7;display:flex;align-items:center;gap:8px}
+.viewport:has(>.measure-hint){--canvas-bottom-offset:64px}
+.workspace-forma .viewport :is(.canvas-bottom-legend,.kpi-pill,.canvas-bottom-controls>.north-compass.small){box-sizing:border-box;height:var(--canvas-bottom-size);background:rgba(255,255,255,.88);border:1px solid var(--pv-border);backdrop-filter:blur(12px);box-shadow:var(--pv-shadow-island)}
+.kpi-pill,.history-pill{border-radius:8px;display:flex;align-items:center}
+.kpi-pill{padding:0 10px;gap:8px}
+.history-pill{position:absolute;top:14px;right:16px;z-index:20;height:40px;padding:4px;gap:2px;background:rgba(255,255,255,.92);backdrop-filter:blur(16px);box-shadow:var(--pv-shadow-island)}
 .history-pill .icon-button{width:30px;height:30px;border-radius:4px;color:var(--pv-text-secondary)}
 .history-pill .icon-button .ui-icon[data-icon]{width:16px;height:16px}
 .kpi-dot{width:7px;height:7px;border-radius:50%;background:var(--pv-solar);flex-shrink:0}
-.kpi-item{display:flex;align-items:baseline;gap:4px}
-.kpi-item strong{font-family:var(--pv-font-mono);font-size:13.5px;font-weight:700;color:var(--pv-text);font-variant-numeric:tabular-nums}
+.kpi-item{display:flex;align-items:baseline;gap:4px;white-space:nowrap}
+.kpi-item strong{font-family:var(--pv-font-mono);font-size:13px;font-weight:700;color:var(--pv-text);font-variant-numeric:tabular-nums}
 .kpi-item span{font-family:var(--pv-font-mono);font-size:11px;color:var(--pv-text-tertiary)}
 .kpi-sep{width:1px;height:16px;background:var(--pv-border)}
 
 .workspace-forma .viewport :is(.display-popover,.image-overlay-panel){left:50%;transform:translateX(-50%);right:auto;top:62px;border:0;border-radius:8px;background:rgba(255,255,255,.96);backdrop-filter:blur(20px);box-shadow:var(--pv-shadow-popover)}
-.workspace-forma .viewport .north-compass.small{right:16px;bottom:16px;top:auto;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);box-shadow:var(--pv-shadow-island);padding:4px}
+.canvas-bottom-controls>.north-compass.small{position:relative;inset:auto;width:var(--canvas-bottom-size);border-radius:50%;padding:0;filter:none}
+.canvas-bottom-controls>.north-compass.small.is-rotated{pointer-events:auto;cursor:pointer}
+.workspace-forma .viewport .canvas-bottom-controls>.north-compass.small.is-rotated:hover{background:#fff;border-color:var(--pv-accent-border)}
 
 @media(min-width:701px){
+ @container workbench-viewport (max-width:720px){
+  .history-pill{top:62px}
+ }
  @container workbench-viewport (max-width:1000px){
-  .top-right-cluster{top:62px}
   .workspace-forma .viewport :is(.display-popover,.image-overlay-panel){z-index:21}
  }
 }
@@ -714,8 +721,9 @@ input[type=checkbox],input[type=radio],input[type=range]{accent-color:var(--pv-a
  .workspace-forma .editor-float.sidebar-drawer{position:absolute;left:10px;top:106px;bottom:auto;z-index:25;width:min(320px,calc(100vw - 20px));height:auto;max-height:calc(100% - 176px);border-radius:12px;box-shadow:var(--pv-shadow-popover);border:1px solid var(--pv-border)}
  .workspace-forma .editor-float.sidebar-drawer.is-collapsed{width:0!important}
  .workspace-forma .viewport .viewport-tools.canvas-island{top:auto;bottom:12px;left:50%;transform:translateX(-50%)}
- .top-right-cluster{top:10px;right:10px}
- .workspace-forma .viewport .north-compass.small{bottom:72px;right:12px}
+ .history-pill{top:10px;right:10px}
+ .workspace-forma .viewport{--canvas-bottom-inset:12px;--canvas-bottom-offset:68px}
+ .workspace-forma .viewport:has(>.measure-hint){--canvas-bottom-offset:116px}
  .workspace-forma .viewport :is(.display-popover,.image-overlay-panel){left:auto;right:10px;transform:none;top:auto;bottom:68px}
  .workspace-forma .viewport .image-overlay-panel{left:50%;right:auto;transform:translateX(-50%);max-width:calc(100% - 24px)}
 }
@@ -726,6 +734,10 @@ input[type=checkbox],input[type=radio],input[type=range]{accent-color:var(--pv-a
 }
 @container workbench-viewport (max-width:360px){
  .workspace-forma .viewport .viewport-tools.canvas-island{height:auto;flex-wrap:wrap;justify-content:center}
+}
+@media(max-width:360px){
+ .workspace-forma .viewport{--canvas-bottom-offset:100px}
+ .workspace-forma .viewport:has(>.measure-hint){--canvas-bottom-offset:148px}
 }
 
 /* Layout inspector shares the region inspector's typography and row rhythm. */

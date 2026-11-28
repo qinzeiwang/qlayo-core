@@ -18,7 +18,7 @@ export function Compass({angle=0,small,viewRotation=0,onClick}:{angle?:number;sm
  const resetTitle=tx('当前画布已旋转 {0}°，点击恢复正北',viewRotation.toFixed(1));
  // The canvas mark is only the arrow (owner): a thin white edge keeps it readable on dark drawings and panels.
  if(small){
-  const body=<><svg viewBox="0 0 64 64" aria-hidden="true"><g transform={`rotate(${angle} 32 32)`} stroke="white" strokeWidth="2.5" strokeLinejoin="round" paintOrder="stroke"><path d="M32 10 21 52 32 43Z" fill="#d97706"/><path d="M32 10 43 52 32 43Z" fill="#9ca3af"/></g></svg>{rotated&&<span className="compass-angle-badge">{`${viewRotation>0?'+':''}${viewRotation.toFixed(1)}°`}</span>}</>;
+  const body=<svg viewBox="0 0 64 64" aria-hidden="true"><g transform={`rotate(${angle} 32 32)`} stroke="white" strokeWidth="2.5" strokeLinejoin="round" paintOrder="stroke"><path d="M32 10 21 52 32 43Z" fill="#d97706"/><path d="M32 10 43 52 32 43Z" fill="#9ca3af"/></g></svg>;
   if(onClick)return <button type="button" className="north-compass small is-rotated" title={resetTitle} aria-label={resetTitle} onClick={onClick}>{body}</button>;
   return <div className="north-compass small" role="img" aria-label={tx('北方向 {0} 度',angle.toFixed(1))}>{body}</div>;
  }

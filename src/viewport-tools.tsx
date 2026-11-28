@@ -216,25 +216,18 @@ function LayoutImageMenu({mode,viewRotation,disabled,siteId,hasBase,baseVisible,
  </div>;
 }
 
-type ClusterProps={
- viewOnly?:boolean;
- total:{count:number;capacity:number};
- regionCount:number;
- history:{undo:()=>void;redo:()=>void;canUndo:boolean;canRedo:boolean};
- disabled:boolean;
-};
-/** Top-right live KPI pill (total capacity + module count) and Undo/Redo pill. */
-export function TopRightCluster({viewOnly,total,regionCount,history,disabled}:ClusterProps){
- return <div className="top-right-cluster">
-  <div className="kpi-pill" title={tx('总装机量')+' · '+regionCount+' '+tx('个区域')}>
+export function CanvasOverview({total,regionCount}:{total:{count:number;capacity:number};regionCount:number}){
+ return <div className="kpi-pill" title={tx('总装机量')+' · '+regionCount+' '+tx('个区域')}>
    <span className="kpi-dot" aria-hidden="true"/>
    <span className="kpi-item"><strong>{total.capacity.toFixed(1)}</strong><span>kWp</span></span>
    <span className="kpi-sep" aria-hidden="true"/>
    <span className="kpi-item"><strong>{total.count}</strong><span>{tx('块')}</span></span>
-  </div>
-  {!viewOnly&&<div className="history-pill history-actions">
+ </div>;
+}
+
+export function CanvasHistory({history,disabled}:{history:{undo:()=>void;redo:()=>void;canUndo:boolean;canRedo:boolean};disabled:boolean}){
+ return <div className="history-pill history-actions">
    <button className="icon-button" data-tooltip={isMac?`${tx('撤销')} · ⌘Z`:tx('撤销 · Ctrl+Z')} aria-label={tx('撤销')} disabled={!history.canUndo||disabled} onClick={history.undo}><Icon name="reset"/></button>
    <button className="icon-button" data-tooltip={isMac?`${tx('重做')} · ⇧⌘Z`:tx('重做 · Ctrl+Shift+Z')} aria-label={tx('重做')} disabled={!history.canRedo||disabled} onClick={history.redo}><Icon name="redo"/></button>
-  </div>}
  </div>;
 }
